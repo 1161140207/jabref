@@ -39,11 +39,10 @@ public class ContainsAndRegexBasedSearchRuleDescriber implements SearchDescriber
             }
         }
 
-        String genericDescription = "\n\n" + Localization.lang("Hint: To search specific fields only, enter for example:<p><tt>author=smith and title=electrical</tt>");
-        genericDescription = genericDescription.replace("<p>", "\n");
-        List<Text> genericDescriptionTexts = TooltipTextUtil.formatToTexts(genericDescription, new TooltipTextUtil.TextReplacement("<tt>author=smith and title=electrical</tt>", "author=smith and title=electrical", TooltipTextUtil.TextType.MONOSPACED));
         textList.add(getCaseSensitiveDescription());
-        textList.addAll(genericDescriptionTexts);
+        textList.add(TooltipTextUtil.createText("\n\n" +
+            Localization.lang("Hint: To search specific fields only, enter for example:")));
+        textList.add(TooltipTextUtil.createText(" author=smith and title=electrical", TooltipTextUtil.TextType.MONOSPACED));
 
         TextFlow searchDescription = new TextFlow();
         searchDescription.getChildren().setAll(textList);

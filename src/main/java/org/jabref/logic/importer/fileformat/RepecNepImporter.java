@@ -14,7 +14,9 @@ import org.jabref.logic.importer.ParserResult;
 import org.jabref.logic.util.StandardFileType;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.Date;
-import org.jabref.model.entry.FieldName;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.entry.types.StandardEntryType;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -234,8 +236,8 @@ public class RepecNepImporter extends Importer {
      */
     private void parseTitleString(BibEntry be, BufferedReader in) throws IOException {
         // skip article number
-        this.lastLine = this.lastLine.substring(this.lastLine.indexOf('.') + 1, this.lastLine.length());
-        be.setField(FieldName.TITLE, readMultipleLines(in));
+        this.lastLine = this.lastLine.substring(this.lastLine.indexOf('.') + 1);
+        be.setField(StandardField.TITLE, readMultipleLines(in));
     }
 
     /**
@@ -264,7 +266,7 @@ public class RepecNepImporter extends Importer {
                                         .indexOf(')') : this.lastLine.length())
                                 .trim());
             } else {
-                author = this.lastLine.substring(0, this.lastLine.length()).trim();
+                author = this.lastLine.trim();
                 institutionDone = true;
             }
 
@@ -285,10 +287,10 @@ public class RepecNepImporter extends Importer {
         }
 
         if (!authors.isEmpty()) {
-            be.setField(FieldName.AUTHOR, String.join(" and ", authors));
+            be.setField(StandardField.AUTHOR, String.join(" and ", authors));
         }
         if (institutions.length() > 0) {
-            be.setField(FieldName.INSTITUTION, institutions.toString());
+            be.setField(StandardField.INSTITUTION, institutions.toString());
         }
     }
 
@@ -302,7 +304,7 @@ public class RepecNepImporter extends Importer {
         String theabstract = readMultipleLines(in);
 
         if (!"".equals(theabstract)) {
-            be.setField(FieldName.ABSTRACT, theabstract);
+            be.setField(StandardField.ABSTRACT, theabstract);
         }
     }
 
@@ -326,24 +328,24 @@ public class RepecNepImporter extends Importer {
             // if multiple lines for a field are allowed and field consists of multiple lines, join them
             String keyword = "".equals(this.lastLine) ? "" : this.lastLine.substring(0, this.lastLine.indexOf(':')).trim();
             // skip keyword
-            this.lastLine = "".equals(this.lastLine) ? "" : this.lastLine.substring(this.lastLine.indexOf(':') + 1, this.lastLine.length()).trim();
+            this.lastLine = "".equals(this.lastLine) ? "" : this.lastLine.substring(this.lastLine.indexOf(':') + 1).trim();
 
-            // parse keywords field
             if ("Keywords".equals(keyword)) {
+                // parse keywords field
                 String content = readMultipleLines(in);
                 String[] keywords = content.split("[,;]");
                 be.addKeywords(Arrays.asList(keywords),
                         importFormatPreferences.getKeywordSeparator());
-                // parse JEL field
             } else if ("JEL".equals(keyword)) {
-                be.setField("jel", readMultipleLines(in));
+                // parse JEL field
+                be.setField(new UnknownField("jel"), readMultipleLines(in));
 
             } else if (keyword.startsWith("Date")) {
                 // parse date field
                 String content = readMultipleLines(in);
                 Date.parse(content).ifPresent(be::setDate);
-                // parse URL field
             } else if (keyword.startsWith("URL")) {
+                // parse URL field
                 String content;
                 if (multilineUrlFieldAllowed) {
                     content = readMultipleLines(in);
@@ -351,11 +353,9 @@ public class RepecNepImporter extends Importer {
                     content = this.lastLine;
                     readLine(in);
                 }
-                be.setField(FieldName.URL, content);
-
-                // authors field
+                be.setField(StandardField.URL, content);
             } else if (keyword.startsWith("By")) {
-                // parse authors
+                // parse authors field
                 parseAuthors(be, in);
             } else {
                 readLine(in);
@@ -386,8 +386,7 @@ public class RepecNepImporter extends Importer {
                     this.inOverviewSection = this.preLine.startsWith("In this issue we have");
                 }
                 if (isStartOfWorkingPaper()) {
-                    BibEntry be = new BibEntry();
-                    be.setType("techreport");
+                    BibEntry be = new BibEntry(StandardEntryType.TechReport);
                     paperNoStr = this.lastLine.substring(0, this.lastLine.indexOf('.'));
                     parseTitleString(be, reader);
                     if (startsWithKeyword(RepecNepImporter.RECOGNIZED_FIELDS)) {

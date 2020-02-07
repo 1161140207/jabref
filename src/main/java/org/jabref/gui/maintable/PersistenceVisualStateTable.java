@@ -1,16 +1,13 @@
 package org.jabref.gui.maintable;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.stream.Collectors;
 
-import javafx.collections.ListChangeListener;
-import javafx.scene.control.TableColumn;
+import javafx.beans.InvalidationListener;
 
 import org.jabref.preferences.JabRefPreferences;
 
 /**
- * Keep track of changes made to the columns, like reordering or resizing.
- *
+ * Keep track of changes made to the columns (reordering, resorting, resizing).
  */
 public class PersistenceVisualStateTable {
 
@@ -21,38 +18,28 @@ public class PersistenceVisualStateTable {
         this.mainTable = mainTable;
         this.preferences = preferences;
 
-        mainTable.getColumns().addListener(this::onColumnsChanged);
-    }
+        mainTable.getColumns().addListener((InvalidationListener) obs -> updateColumnPreferences());
+        mainTable.getSortOrder().addListener((InvalidationListener) obs -> updateColumnPreferences());
 
-    private void onColumnsChanged(ListChangeListener.Change<? extends TableColumn<BibEntryTableViewModel, ?>> change) {
-        boolean changed = false;
-        while (change.next()) {
-            changed = true;
-        }
-
-        if (changed) {
-            updateColumnPreferences();
-        }
+        // As we store the ColumnModels of the MainTable, we need to add the listener to the ColumnModel properties,
+        // since the value is bound to the model after the listener to the column itself is called.
+        mainTable.getColumns().forEach(col ->
+                ((MainTableColumn<?>) col).getModel().widthProperty().addListener(obs -> updateColumnPreferences()));
+        mainTable.getColumns().forEach(col ->
+                ((MainTableColumn<?>) col).getModel().sortTypeProperty().addListener(obs -> updateColumnPreferences()));
     }
 
     /**
-     * Store shown columns and their width in preferences.
+     * Store shown columns, their width and their sortType in preferences.
      */
     private void updateColumnPreferences() {
-        List<String> columnNames = new ArrayList<>();
-        List<String> columnsWidths = new ArrayList<>();
-
-        for (TableColumn<BibEntryTableViewModel, ?> column : mainTable.getColumns()) {
-            if (column instanceof NormalTableColumn) {
-                NormalTableColumn normalColumn = (NormalTableColumn) column;
-
-                columnNames.add(normalColumn.getColumnName());
-                columnsWidths.add(String.valueOf(normalColumn.getWidth()));
-            }
-        }
-
-        // Finally, we store the new preferences.
-        preferences.putStringList(JabRefPreferences.COLUMN_NAMES, columnNames);
-        preferences.putStringList(JabRefPreferences.COLUMN_WIDTHS, columnsWidths);
+        preferences.storeColumnPreferences(new ColumnPreferences(
+                mainTable.getColumns().stream()
+                        .map(column -> ((MainTableColumn<?>) column).getModel())
+                        .collect(Collectors.toList()),
+                mainTable.getSortOrder().stream()
+                        .map(column -> ((MainTableColumn<?>) column).getModel())
+                        .collect(Collectors.toList())
+        ));
     }
 }

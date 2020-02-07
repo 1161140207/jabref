@@ -1,7 +1,7 @@
 This document lists the fonts, icons, and libraries used by JabRef.
 This file is manually kept in sync with build.gradle and the binary jars contained in the lib/ directory.
 
-One can list all depdencies by using Gradle task `depdencyReport`.
+One can list all dependencies by using Gradle task `dependencyReport`.
 It generated the file [build/reports/project/dependencies.txt](build/reports/project/dependencies.txt).
 
 # Legend
@@ -13,10 +13,16 @@ In case you add a library, please use these identifiers.
 For instance, "BSD" is not exact enough, there are numerous variants out there: BSD-2-Clause, BSD-3-Clause-No-Nuclear-Warranty, ...
 Note that the SPDX license identifiers are different from the ones used by debian. See https://wiki.debian.org/Proposals/CopyrightFormat for more information.
 
+# bst files
+
+Project: IEEEtran
+Path:    src/main/resources/bst/IEEEtran.bst
+URL:     https://www.ctan.org/tex-archive/macros/latex/contrib/IEEEtran/bibtex
+License: LPPL-1.3
 
 # Fonts and Icons
 
-The loading animation during loading of recommendations from Mr. DLib is created by <http://loading.io/> and is free of use under licence CC0 1.0.
+The loading animation during loading of recommendations from Mr. DLib is created by <http://loading.io/> and is free of use under license CC0 1.0.
 
 Id:      material-design-icons.font
 Project: Material Design Icons
@@ -50,19 +56,9 @@ Project: pgjdbc-ng
 URL:     http://impossibl.github.io/pgjdbc-ng
 License: BSD-3-Clause
 
-Id:      com.jgoodies:jgoodies-common
-Project: JGoodies Common
-URL:     http://www.jgoodies.com/downloads/libraries/
-License: BSD-3-Clause
-
-Id:      com.jgoodies:jgoodies-forms
-Project: JGoodies Forms
-URL:     http://www.jgoodies.com/downloads/libraries/
-License: BSD-3-Clause
-
-Id:      com.mashape.unirest
+Id:      com.konghq.unirest
 Project: Unirest for Java
-URL:     https://github.com/Mashape/unirest-java
+URL:     https://github.com/Kong/unirest-java
 License: MIT
 
 Id:      com.microsoft.azure:applicationinsights-core
@@ -74,6 +70,11 @@ Id:      com.microsoft.azure:applicationinsights-logging-log4j2
 Project: Application Insights SDK for Java
 URL:     https://github.com/Microsoft/ApplicationInsights-Java
 License: MIT
+
+Id:      com.oracle.ojdbc:ojdbc10
+Project: Oracle's JDBC drivers
+URL:     https://repo1.maven.org/maven2/com/oracle/ojdbc/ojdbc10/19.3.0.0/ojdbc10-19.3.0.0.pom
+License: Oracle Free Use Terms and Conditions (FUTC)
 
 Id:      com.sibvisions.external.jvxfx:DnDTabPane
 Project: Drag'n'Drop TabPane
@@ -118,12 +119,7 @@ License: MIT
 Id:      io.github.java-diff-utils:java-diff-utils
 Project: java-diff-utils
 URL:     https://github.com/java-diff-utils/java-diff-utils
-License: Apache-1.1
-
-Id:      mysql:mysql-connector-java
-Project: MySQL Connector/J
-URL:     http://www.mysql.de/downloads/connector/j/
-License: GPL-2.0 and Oracle's FOSS License Exception (http://www.mysql.com/about/legal/licensing/foss-exception/) allowing GPLv3
+License: Apache-2.0
 
 Id:      net.java.dev.glazedlists:glazedlists_java15
 Project: Glazed Lists
@@ -139,6 +135,11 @@ Id:      org.antlr:antlr4
 Project: ANTLR 4
 URL:     http://www.antlr.org/
 License: BSD-3-Clause
+
+Id:      org.apache.commons:commons-csv
+Project: Apache Commons CSV
+URL:     https://commons.apache.org/proper/commons-csv/
+License: Apache-2.0
 
 Id:      org.apache.commons:commons-lang3
 Project: Apache Commons Lang
@@ -205,6 +206,11 @@ Project: jsoup
 URL:     https://github.com/jhy/jsoup/
 License: MIT
 
+Id:      org.mariadb.jdbc:mariadb-java-client
+Project: MariaDB Java Client
+URL:     https://mariadb.com/kb/en/library/about-mariadb-connector-j/
+License: LGPL-2.1-or-later
+
 Id:      org.openoffice:juh
 Project: OpenOffice.org
 URL:     http://www.openoffice.org/api/SDK
@@ -234,11 +240,5 @@ Id:      org.xmlunit:xmlunit-matchers
 Project: XMLUnit
 URL:     http://www.xmlunit.org/
 License: Apache-2.0
-
-Id:      spin
-Path:    lib/spin.jar
-Project: Spin
-URL:     http://spin.sourceforge.net/
-License: LGPL-2.1+
 
 The last entry has to end with an empty line. Otherwise the entry is not present in About.html.

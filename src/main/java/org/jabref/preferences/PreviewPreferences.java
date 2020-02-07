@@ -3,27 +3,29 @@ package org.jabref.preferences;
 import java.util.List;
 
 import org.jabref.Globals;
+import org.jabref.logic.citationstyle.PreviewLayout;
+import org.jabref.logic.citationstyle.TextBasedPreviewLayout;
 import org.jabref.logic.layout.LayoutFormatterPreferences;
 
 public class PreviewPreferences {
 
-    private final List<String> previewCycle;
-    private int previewCyclePosition;
+    private final List<PreviewLayout> previewCycle;
+    private final int previewCyclePosition;
     private final Number previewPanelDividerPosition;
-    private final boolean previewPanelEnabled;
     private final String previewStyle;
     private final String previewStyleDefault;
+    private final boolean showPreviewAsExtraTab;
 
-    public PreviewPreferences(List<String> previewCycle, int previeCyclePosition, Number previewPanelDividerPosition, boolean previewPanelEnabled, String previewStyle, String previewStyleDefault) {
+    public PreviewPreferences(List<PreviewLayout> previewCycle, int previewCyclePosition, Number previewPanelDividerPosition, String previewStyle, String previewStyleDefault, boolean showPreviewAsExtraTab) {
         this.previewCycle = previewCycle;
-        this.previewCyclePosition = previeCyclePosition;
+        this.previewCyclePosition = previewCyclePosition;
         this.previewPanelDividerPosition = previewPanelDividerPosition;
-        this.previewPanelEnabled = previewPanelEnabled;
         this.previewStyle = previewStyle;
         this.previewStyleDefault = previewStyleDefault;
+        this.showPreviewAsExtraTab = showPreviewAsExtraTab;
     }
 
-    public List<String> getPreviewCycle() {
+    public List<PreviewLayout> getPreviewCycle() {
         return previewCycle;
     }
 
@@ -35,15 +37,11 @@ public class PreviewPreferences {
         return previewPanelDividerPosition;
     }
 
-    public boolean isPreviewPanelEnabled() {
-        return previewPanelEnabled;
-    }
-
     public String getPreviewStyle() {
         return previewStyle;
     }
 
-    public String getPreviewStyleDefault() {
+    public String getDefaultPreviewStyle() {
         return previewStyleDefault;
     }
 
@@ -51,7 +49,7 @@ public class PreviewPreferences {
         return new Builder(this);
     }
 
-    public String getCurrentPreviewStyle() {
+    public PreviewLayout getCurrentPreviewStyle() {
         return getPreviewCycle().get(getPreviewCyclePosition());
     }
 
@@ -59,45 +57,57 @@ public class PreviewPreferences {
         return Globals.prefs.getLayoutFormatterPreferences(Globals.journalAbbreviationLoader);
     }
 
+    public PreviewLayout getTextBasedPreviewLayout() {
+        return new TextBasedPreviewLayout(getPreviewStyle(), getLayoutFormatterPreferences());
+    }
+
+    public boolean showPreviewAsExtraTab() {
+        return showPreviewAsExtraTab;
+    }
+
     public static class Builder {
-        private List<String> previewCycle;
-        private int previeCyclePosition;
+
+        private boolean showPreviewAsExtraTab;
+        private List<PreviewLayout> previewCycle;
+        private int previewCyclePosition;
         private Number previewPanelDividerPosition;
-        private boolean previewPanelEnabled;
         private String previewStyle;
         private final String previewStyleDefault;
 
-
         public Builder(PreviewPreferences previewPreferences) {
             this.previewCycle = previewPreferences.getPreviewCycle();
-            this.previeCyclePosition = previewPreferences.getPreviewCyclePosition();
+            this.previewCyclePosition = previewPreferences.getPreviewCyclePosition();
             this.previewPanelDividerPosition = previewPreferences.getPreviewPanelDividerPosition();
-            this.previewPanelEnabled = previewPreferences.isPreviewPanelEnabled();
             this.previewStyle = previewPreferences.getPreviewStyle();
-            this.previewStyleDefault = previewPreferences.getPreviewStyleDefault();
+            this.previewStyleDefault = previewPreferences.getDefaultPreviewStyle();
+            this.showPreviewAsExtraTab = previewPreferences.showPreviewAsExtraTab();
         }
 
-        public Builder withPreviewCycle(List<String> previewCycle) {
+        public Builder withShowAsExtraTab(boolean showAsExtraTab) {
+            this.showPreviewAsExtraTab = showAsExtraTab;
+            return this;
+        }
+
+        public Builder withPreviewCycle(List<PreviewLayout> previewCycle) {
             this.previewCycle = previewCycle;
-            return withPreviewCyclePosition(previeCyclePosition);
+            return withPreviewCyclePosition(previewCyclePosition);
         }
 
         public Builder withPreviewCyclePosition(int position) {
-            previeCyclePosition = position;
-            while (previeCyclePosition < 0) {
-                previeCyclePosition += previewCycle.size();
+            if (previewCycle.isEmpty()) {
+                previewCyclePosition = 0;
+            } else {
+                previewCyclePosition = position;
+                while (previewCyclePosition < 0) {
+                    previewCyclePosition += previewCycle.size();
+                }
+                previewCyclePosition %= previewCycle.size();
             }
-            previeCyclePosition %= previewCycle.size();
             return this;
         }
 
         public Builder withPreviewPanelDividerPosition(Number previewPanelDividerPosition) {
             this.previewPanelDividerPosition = previewPanelDividerPosition;
-            return this;
-        }
-
-        public Builder withPreviewPanelEnabled(boolean previewPanelEnabled) {
-            this.previewPanelEnabled = previewPanelEnabled;
             return this;
         }
 
@@ -107,7 +117,7 @@ public class PreviewPreferences {
         }
 
         public PreviewPreferences build() {
-            return new PreviewPreferences(previewCycle, previeCyclePosition, previewPanelDividerPosition, previewPanelEnabled, previewStyle, previewStyleDefault);
+            return new PreviewPreferences(previewCycle, previewCyclePosition, previewPanelDividerPosition, previewStyle, previewStyleDefault, showPreviewAsExtraTab);
         }
     }
 

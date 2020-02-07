@@ -7,6 +7,7 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.Objects;
 
 import org.jabref.model.util.FileUpdateListener;
 import org.jabref.model.util.FileUpdateMonitor;
@@ -19,7 +20,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class monitors a set of files for changes. Upon detecting a change it notifies the registered {@link
  * FileUpdateListener}s.
- *
+ * <p>
  * Implementation based on https://stackoverflow.com/questions/16251273/can-i-watch-for-single-file-change-with-watchservice-not-the-whole-directory
  */
 public class DefaultFileUpdateMonitor implements Runnable, FileUpdateMonitor {
@@ -59,7 +60,7 @@ public class DefaultFileUpdateMonitor implements Runnable, FileUpdateMonitor {
                 Thread.yield();
             }
         } catch (Throwable e) {
-            LOGGER.debug("FileUpdateMonitor has been interrupted. Terminating...", e);
+            LOGGER.error("FileUpdateMonitor has been interrupted.", e);
         }
     }
 
@@ -69,6 +70,8 @@ public class DefaultFileUpdateMonitor implements Runnable, FileUpdateMonitor {
 
     @Override
     public void addListenerForFile(Path file, FileUpdateListener listener) throws IOException {
+        Objects.requireNonNull(watcher, "You need to start the file monitor before watching files");
+
         // We can't watch files directly, so monitor their parent directory for updates
         Path directory = file.toAbsolutePath().getParent();
         directory.register(watcher, StandardWatchEventKinds.ENTRY_MODIFY);

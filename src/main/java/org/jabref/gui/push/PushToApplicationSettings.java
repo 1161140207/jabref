@@ -1,69 +1,56 @@
 package org.jabref.gui.push;
 
-import javax.swing.JButton;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.GridPane;
 
 import org.jabref.Globals;
 import org.jabref.gui.DialogService;
-import org.jabref.gui.util.DefaultTaskExecutor;
 import org.jabref.gui.util.FileDialogConfiguration;
 import org.jabref.logic.l10n.Localization;
 import org.jabref.preferences.JabRefPreferences;
 
-import com.jgoodies.forms.builder.FormBuilder;
-import com.jgoodies.forms.layout.FormLayout;
-
 public class PushToApplicationSettings {
-    protected final JTextField path = new JTextField(30);
-    protected JPanel settings;
-    protected FormBuilder builder;
-    protected AbstractPushToApplication application;
-    private DialogService dialogService;
 
-    /**
-     * This method asks the implementing class to return a JPanel populated with the imlementation's options panel, if
-     * necessary. If the JPanel is shown to the user, and the user indicates that settings should be stored, the
-     * implementation's storeSettings() method will be called. This method must make sure all widgets in the panel are
-     * in the correct selection states.
-     *
-     * @return a JPanel containing options, or null if options are not needed.
-     */
-    public JPanel getSettingsPanel() {
-        application.initParameters();
-        String commandPath = Globals.prefs.get(application.commandPathPreferenceKey);
-        if (settings == null) {
-            initSettingsPanel();
-        }
-        path.setText(commandPath);
-        return settings;
-    }
+    protected final Label commandLabel;
+    protected final TextField path;
+    protected final GridPane settingsPane;
+    private final AbstractPushToApplication application;
+    private final DialogService dialogService;
+    private final Button browse;
 
-    /**
-     * Create a FormBuilder, fill it with a textbox for the path and store the JPanel in settings
-     */
-    protected void initSettingsPanel() {
-        builder = FormBuilder.create();
-        builder.layout(new FormLayout("left:pref, 4dlu, fill:pref:grow, 4dlu, fill:pref", "p"));
-        StringBuilder label = new StringBuilder(Localization.lang("Path to %0", application.getApplicationName()));
+    public PushToApplicationSettings(PushToApplication application, DialogService dialogService) {
+        this.application = (AbstractPushToApplication) application;
+        this.dialogService = dialogService;
+        settingsPane = new GridPane();
+        settingsPane.setHgap(10.0);
+        settingsPane.setVgap(4.0);
+
+        commandLabel = new Label();
+        path = new TextField();
+        browse = new Button(Localization.lang("Browse"));
+
+        this.application.initParameters();
+
         // In case the application name and the actual command is not the same, add the command in brackets
-        if (application.getCommandName() == null) {
-            label.append(':');
+        StringBuilder commandLine = new StringBuilder(Localization.lang("Path to %0", application.getApplicationName()));
+        if (this.application.getCommandName() == null) {
+            commandLine.append(':');
         } else {
-            label.append(" (").append(application.getCommandName()).append("):");
+            commandLine.append(" (").append(this.application.getCommandName()).append("):");
         }
-        builder.add(label.toString()).xy(1, 1);
-        builder.add(path).xy(3, 1);
-        JButton browse = new JButton(Localization.lang("Browse"));
+        commandLabel.setText(commandLine.toString());
+        settingsPane.add(commandLabel, 0, 0);
+
+        path.setText(Globals.prefs.get(this.application.commandPathPreferenceKey));
+        settingsPane.add(path, 1, 0);
 
         FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()
                 .withInitialDirectory(Globals.prefs.get(JabRefPreferences.WORKING_DIRECTORY)).build();
-
-        browse.addActionListener(
-                e -> DefaultTaskExecutor.runInJavaFXThread(() -> dialogService.showFileOpenDialog(fileDialogConfiguration))
-                                        .ifPresent(f -> path.setText(f.toAbsolutePath().toString())));
-        builder.add(browse).xy(5, 1);
-        settings = builder.build();
+        browse.setOnAction(e -> dialogService.showFileOpenDialog(fileDialogConfiguration)
+                                             .ifPresent(f -> path.setText(f.toAbsolutePath().toString())));
+        settingsPane.add(browse, 2, 0);
     }
 
     /**
@@ -73,5 +60,9 @@ public class PushToApplicationSettings {
      */
     public void storeSettings() {
         Globals.prefs.put(application.commandPathPreferenceKey, path.getText());
+    }
+
+    public GridPane getSettingsPane() {
+        return settingsPane;
     }
 }

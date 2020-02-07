@@ -16,7 +16,7 @@ import org.jabref.model.auxparser.AuxParser;
 import org.jabref.model.auxparser.AuxParserResult;
 import org.jabref.model.database.BibDatabase;
 import org.jabref.model.entry.BibEntry;
-import org.jabref.model.entry.FieldName;
+import org.jabref.model.entry.field.StandardField;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,16 +24,13 @@ import org.slf4j.LoggerFactory;
 /**
  * LaTeX Aux to BibTeX Parser
  * <p>
- * Extracts a subset of BibTeX entries from a BibDatabase that are included in an AUX file.
- * Also supports nested AUX files (latex \\include).
+ * Extracts a subset of BibTeX entries from a BibDatabase that are included in an AUX file. Also supports nested AUX
+ * files (latex \\include).
  *
- * There exists no specification of the AUX file.
- * Every package, class or document can write to the AUX file.
- * The AUX file consists of LaTeX macros and is read at the \begin{document} and again at the \end{document}.
+ * There exists no specification of the AUX file. Every package, class or document can write to the AUX file. The AUX
+ * file consists of LaTeX macros and is read at the \begin{document} and again at the \end{document}.
  *
- * BibTeX citation: \citation{x,y,z}
- * Biblatex citation: \abx@aux@cite{x,y,z}
- * Nested AUX files: \@input{x}
+ * BibTeX citation: \citation{x,y,z} Biblatex citation: \abx@aux@cite{x,y,z} Nested AUX files: \@input{x}
  */
 public class DefaultAuxParser implements AuxParser {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultAuxParser.class);
@@ -77,7 +74,7 @@ public class DefaultAuxParser implements AuxParser {
                     matchNestedAux(auxFile, result, fileList, line);
                 }
             } catch (FileNotFoundException e) {
-                LOGGER.info("Cannot locate input file", e);
+                LOGGER.warn("Cannot locate input file", e);
             } catch (IOException e) {
                 LOGGER.warn("Problem opening file", e);
             }
@@ -123,22 +120,26 @@ public class DefaultAuxParser implements AuxParser {
         }
     }
 
-    /*
+    /**
      * Try to find an equivalent BibTeX entry inside the reference database for all keys inside the AUX file.
+     *
+     * @param result AUX file
      */
     private void resolveTags(AuxParserResult result) {
-        for (String key : result.getUniqueKeys()) {
-            Optional<BibEntry> entry = masterDatabase.getEntryByKey(key);
+        List<BibEntry> entriesToInsert = new ArrayList<>();
 
-            if (result.getGeneratedBibDatabase().getEntryByKey(key).isPresent()) {
-                // do nothing, key has already been processed
-            } else if (entry.isPresent()) {
-                insertEntry(entry.get(), result);
-                resolveCrossReferences(entry.get(), result);
-            } else {
-                result.getUnresolvedKeys().add(key);
+        for (String key : result.getUniqueKeys()) {
+            if (!result.getGeneratedBibDatabase().getEntryByKey(key).isPresent()) {
+                Optional<BibEntry> entry = masterDatabase.getEntryByKey(key);
+                if (entry.isPresent()) {
+                    entriesToInsert.add(entry.get());
+                } else {
+                    result.getUnresolvedKeys().add(key);
+                }
             }
         }
+        insertEntries(entriesToInsert, result);
+        resolveCrossReferences(entriesToInsert, result);
 
         // Copy database definitions
         if (result.getGeneratedBibDatabase().hasEntries()) {
@@ -147,29 +148,44 @@ public class DefaultAuxParser implements AuxParser {
         }
     }
 
-    /*
-     * Resolves and adds CrossRef entries
+    /**
+     * Resolves and adds CrossRef entries to insert them in addition to the original entries
+     *
+     * @param entries Entries to check for CrossRefs
+     * @param result AUX file
      */
-    private void resolveCrossReferences(BibEntry entry, AuxParserResult result) {
-        entry.getField(FieldName.CROSSREF).ifPresent(crossref -> {
-            if (!result.getGeneratedBibDatabase().getEntryByKey(crossref).isPresent()) {
-                Optional<BibEntry> refEntry = masterDatabase.getEntryByKey(crossref);
+    private void resolveCrossReferences(List<BibEntry> entries, AuxParserResult result) {
+        List<BibEntry> entriesToInsert = new ArrayList<>();
+        for (BibEntry entry : entries) {
+            entry.getField(StandardField.CROSSREF).ifPresent(crossref -> {
+                if (!result.getGeneratedBibDatabase().getEntryByKey(crossref).isPresent()) {
+                    Optional<BibEntry> refEntry = masterDatabase.getEntryByKey(crossref);
 
-                if (refEntry.isPresent()) {
-                    insertEntry(refEntry.get(), result);
-                    result.increaseCrossRefEntriesCounter();
-                } else {
-                    result.getUnresolvedKeys().add(crossref);
+                    if (refEntry.isPresent()) {
+                        if (!entriesToInsert.contains(refEntry.get())) {
+                            entriesToInsert.add(refEntry.get());
+                            result.increaseCrossRefEntriesCounter();
+                        }
+                    } else {
+                        result.getUnresolvedKeys().add(crossref);
+                    }
                 }
-            }
-        });
+            });
+        }
+        insertEntries(entriesToInsert, result);
     }
 
-    /*
-     * Insert a clone of the given entry. The clone is given a new unique ID.
+    /**
+     * Insert a clone of each given entry. The clones are each given a new unique ID.
+     *
+     * @param entries Entries to be cloned
+     * @param result AUX file
      */
-    private void insertEntry(BibEntry entry, AuxParserResult result) {
-        BibEntry clonedEntry = (BibEntry) entry.clone();
-        result.getGeneratedBibDatabase().insertEntry(clonedEntry);
+    private void insertEntries(List<BibEntry> entries, AuxParserResult result) {
+        List<BibEntry> clonedEntries = new ArrayList<>();
+        for (BibEntry entry : entries) {
+            clonedEntries.add((BibEntry) entry.clone());
+        }
+        result.getGeneratedBibDatabase().insertEntries(clonedEntries);
     }
 }

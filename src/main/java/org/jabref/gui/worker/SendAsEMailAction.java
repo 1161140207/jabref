@@ -15,7 +15,7 @@ import org.jabref.gui.actions.BaseAction;
 import org.jabref.gui.desktop.JabRefDesktop;
 import org.jabref.gui.util.BackgroundTask;
 import org.jabref.logic.bibtex.BibEntryWriter;
-import org.jabref.logic.bibtex.LatexFieldFormatter;
+import org.jabref.logic.bibtex.FieldWriter;
 import org.jabref.logic.l10n.Localization;
 import org.jabref.logic.util.io.FileUtil;
 import org.jabref.model.entry.BibEntry;
@@ -46,11 +46,11 @@ public class SendAsEMailAction implements BaseAction {
     @Override
     public void action() {
         BackgroundTask.wrap(this::sendEmail)
-                      .onSuccess(frame::output)
+                      .onSuccess(frame.getDialogService()::notify)
                       .onFailure(e -> {
                           String message = Localization.lang("Error creating email");
                           LOGGER.warn(message, e);
-                          frame.output(message);
+                          frame.getDialogService().notify(message);
                       })
                       .executeWith(Globals.TASK_EXECUTOR);
     }
@@ -72,8 +72,7 @@ public class SendAsEMailAction implements BaseAction {
         List<BibEntry> bes = panel.getSelectedEntries();
 
         // write the entries using sw, which is used later to form the email content
-        BibEntryWriter bibtexEntryWriter = new BibEntryWriter(
-                new LatexFieldFormatter(Globals.prefs.getLatexFieldFormatterPreferences()), true);
+        BibEntryWriter bibtexEntryWriter = new BibEntryWriter(new FieldWriter(Globals.prefs.getFieldWriterPreferences()), Globals.entryTypesManager);
 
         for (BibEntry entry : bes) {
             try {
@@ -90,7 +89,7 @@ public class SendAsEMailAction implements BaseAction {
         boolean openFolders = JabRefPreferences.getInstance().getBoolean(JabRefPreferences.OPEN_FOLDERS_OF_ATTACHED_FILES);
 
         List<Path> fileList = FileUtil.getListOfLinkedFiles(bes, frame.getCurrentBasePanel().getBibDatabaseContext()
-                                                                      .getFileDirectoriesAsPaths(Globals.prefs.getFileDirectoryPreferences()));
+                                                                      .getFileDirectoriesAsPaths(Globals.prefs.getFilePreferences()));
         for (Path f : fileList) {
             attachments.add(f.toAbsolutePath().toString());
             if (openFolders) {

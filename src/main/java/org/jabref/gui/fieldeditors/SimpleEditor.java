@@ -1,6 +1,5 @@
 package org.jabref.gui.fieldeditors;
 
-import javafx.fxml.FXML;
 import javafx.scene.Parent;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.layout.HBox;
@@ -12,23 +11,26 @@ import org.jabref.gui.autocompleter.ContentSelectorSuggestionProvider;
 import org.jabref.gui.fieldeditors.contextmenu.EditorMenus;
 import org.jabref.logic.integrity.FieldCheckers;
 import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
 import org.jabref.preferences.JabRefPreferences;
 
 public class SimpleEditor extends HBox implements FieldEditorFX {
 
-    @FXML private final SimpleEditorViewModel viewModel;
+    private final SimpleEditorViewModel viewModel;
+    private final TextInputControl textInput;
 
-    public SimpleEditor(final String fieldName,
+    public SimpleEditor(final Field field,
                         final AutoCompleteSuggestionProvider<?> suggestionProvider,
                         final FieldCheckers fieldCheckers,
                         final JabRefPreferences preferences,
                         final boolean isSingleLine) {
-        this.viewModel = new SimpleEditorViewModel(fieldName, suggestionProvider, fieldCheckers);
+        this.viewModel = new SimpleEditorViewModel(field, suggestionProvider, fieldCheckers);
 
-        TextInputControl textInput = isSingleLine
+        textInput = isSingleLine
                 ? new EditorTextField()
                 : new EditorTextArea();
         HBox.setHgrow(textInput, Priority.ALWAYS);
+
         textInput.textProperty().bindBidirectional(viewModel.textProperty());
         ((ContextMenuAddable) textInput).addToContextMenu(EditorMenus.getDefaultMenu(textInput));
         this.getChildren().add(textInput);
@@ -42,12 +44,11 @@ public class SimpleEditor extends HBox implements FieldEditorFX {
         new EditorValidator(preferences).configureValidation(viewModel.getFieldValidator().getValidationStatus(), textInput);
     }
 
-
-    public SimpleEditor(final String fieldName,
+    public SimpleEditor(final Field field,
                         final AutoCompleteSuggestionProvider<?> suggestionProvider,
                         final FieldCheckers fieldCheckers,
                         final JabRefPreferences preferences) {
-        this(fieldName, suggestionProvider, fieldCheckers, preferences, false);
+        this(field, suggestionProvider, fieldCheckers, preferences, false);
     }
 
     @Override
@@ -58,5 +59,10 @@ public class SimpleEditor extends HBox implements FieldEditorFX {
     @Override
     public Parent getNode() {
         return this;
+    }
+
+    @Override
+    public void requestFocus() {
+        textInput.requestFocus();
     }
 }

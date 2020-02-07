@@ -4,24 +4,22 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.jabref.logic.importer.ImportFormatPreferences;
-import org.jabref.logic.importer.Importer;
-import org.jabref.logic.importer.ParserResult;
-import org.jabref.logic.importer.fileformat.BibtexParser;
 import org.jabref.logic.layout.Layout;
 import org.jabref.logic.layout.LayoutFormatterPreferences;
 import org.jabref.model.database.BibDatabase;
 import org.jabref.model.entry.BibEntry;
-import org.jabref.model.util.DummyFileUpdateMonitor;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.StandardEntryType;
+import org.jabref.model.entry.types.UnknownEntryType;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,18 +31,16 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-public class OOBibStyleTest {
+class OOBibStyleTest {
     private LayoutFormatterPreferences layoutFormatterPreferences;
-    private ImportFormatPreferences importFormatPreferences;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         layoutFormatterPreferences = mock(LayoutFormatterPreferences.class, Answers.RETURNS_DEEP_STUBS);
-        importFormatPreferences = mock(ImportFormatPreferences.class, Answers.RETURNS_DEEP_STUBS);
     }
 
     @Test
-    public void testAuthorYear() throws IOException {
+    void testAuthorYear() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_AUTHORYEAR_STYLE_PATH, layoutFormatterPreferences);
         assertTrue(style.isValid());
         assertTrue(style.isFromResource());
@@ -57,9 +53,9 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testAuthorYearAsFile() throws URISyntaxException, IOException {
+    void testAuthorYearAsFile() throws URISyntaxException, IOException {
         File defFile = Paths.get(OOBibStyleTest.class.getResource(StyleLoader.DEFAULT_AUTHORYEAR_STYLE_PATH).toURI())
-                .toFile();
+                            .toFile();
         OOBibStyle style = new OOBibStyle(defFile, layoutFormatterPreferences, StandardCharsets.UTF_8);
         assertTrue(style.isValid());
         assertFalse(style.isFromResource());
@@ -72,7 +68,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testNumerical() throws IOException {
+    void testNumerical() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
         assertTrue(style.isValid());
@@ -85,7 +81,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testGetNumCitationMarker() throws IOException {
+    void testGetNumCitationMarker() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
         assertEquals("[1] ", style.getNumCitationMarker(Arrays.asList(1), -1, true));
@@ -102,7 +98,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testGetNumCitationMarkerUndefined() throws IOException {
+    void testGetNumCitationMarkerUndefined() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
         assertEquals("[" + OOBibStyle.UNDEFINED_CITATION_MARKER + "; 2-4] ",
@@ -115,12 +111,12 @@ public class OOBibStyleTest {
                 style.getNumCitationMarker(Arrays.asList(1, 2, 3, 0), 1, true));
 
         assertEquals("[" + OOBibStyle.UNDEFINED_CITATION_MARKER + "; " + OOBibStyle.UNDEFINED_CITATION_MARKER + "; "
-                + OOBibStyle.UNDEFINED_CITATION_MARKER + "] ",
+                        + OOBibStyle.UNDEFINED_CITATION_MARKER + "] ",
                 style.getNumCitationMarker(Arrays.asList(0, 0, 0), 1, true));
     }
 
     @Test
-    public void testGetCitProperty() throws IOException {
+    void testGetCitProperty() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
         assertEquals(", ", style.getStringCitProperty("AuthorSeparator"));
@@ -132,95 +128,95 @@ public class OOBibStyleTest {
         assertTrue(journals.contains("Journal name 1"));
     }
 
-    /**
-     * In IntelliJ: When running this test, ensure that the working directory is <code>%MODULE_WORKING_DIR%"</code>
-     */
     @Test
-    public void testGetCitationMarker() throws IOException {
-        Path testBibtexFile = Paths.get("src/test/resources/testbib/complex.bib");
-        ParserResult result = new BibtexParser(importFormatPreferences, new DummyFileUpdateMonitor()).parse(Importer.getReader(testBibtexFile, StandardCharsets.UTF_8));
-        OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
-                layoutFormatterPreferences);
+    void testGetCitationMarker() throws IOException {
+        OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH, layoutFormatterPreferences);
+        BibEntry entry = new BibEntry()
+                .withField(StandardField.AUTHOR, "Gustav Bostr\\\"{o}m and Jaana W\\\"{a}yrynen and Marine Bod\\'{e}n and Konstantin Beznosov and Philippe Kruchten")
+                .withField(StandardField.YEAR, "2006")
+                .withField(StandardField.BOOKTITLE, "SESS '06: Proceedings of the 2006 international workshop on Software engineering for secure systems")
+                .withField(StandardField.PUBLISHER, "ACM")
+                .withField(StandardField.TITLE, "Extending XP practices to support security requirements engineering")
+                .withField(StandardField.PAGES, "11--18");
+        BibDatabase database = new BibDatabase();
+        database.insertEntry(entry);
         Map<BibEntry, BibDatabase> entryDBMap = new HashMap<>();
-        BibDatabase db = result.getDatabase();
-        for (BibEntry entry : db.getEntries()) {
-            entryDBMap.put(entry, db);
-        }
+        entryDBMap.put(entry, database);
 
-        BibEntry entry = db.getEntryByKey("1137631").get();
         assertEquals("[Boström et al., 2006]",
-                style.getCitationMarker(Arrays.asList(entry), entryDBMap, true, null, null));
+                style.getCitationMarker(Collections.singletonList(entry), entryDBMap, true, null, null));
         assertEquals("Boström et al. [2006]",
-                style.getCitationMarker(Arrays.asList(entry), entryDBMap, false, null, new int[] {3}));
+                style.getCitationMarker(Collections.singletonList(entry), entryDBMap, false, null, new int[]{3}));
         assertEquals("[Boström, Wäyrynen, Bodén, Beznosov & Kruchten, 2006]",
-                style.getCitationMarker(Arrays.asList(entry), entryDBMap, true, null, new int[] {5}));
+                style.getCitationMarker(Collections.singletonList(entry), entryDBMap, true, null, new int[]{5}));
     }
 
-    /**
-     * In IntelliJ: When running this test, ensure that the working directory is <code>%MODULE_WORKING_DIR%"</code>
-     */
     @Test
-    public void testLayout() throws IOException {
-        Path testBibtexFile = Paths.get("src/test/resources/testbib/complex.bib");
-        ParserResult result = new BibtexParser(importFormatPreferences, new DummyFileUpdateMonitor()).parse(Importer.getReader(testBibtexFile, StandardCharsets.UTF_8));
-        OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
-                layoutFormatterPreferences);
-        BibDatabase db = result.getDatabase();
+    void testLayout() throws IOException {
+        OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH, layoutFormatterPreferences);
 
-        Layout l = style.getReferenceFormat("default");
+        BibEntry entry = new BibEntry()
+                .withField(StandardField.AUTHOR, "Gustav Bostr\\\"{o}m and Jaana W\\\"{a}yrynen and Marine Bod\\'{e}n and Konstantin Beznosov and Philippe Kruchten")
+                .withField(StandardField.YEAR, "2006")
+                .withField(StandardField.BOOKTITLE, "SESS '06: Proceedings of the 2006 international workshop on Software engineering for secure systems")
+                .withField(StandardField.PUBLISHER, "ACM")
+                .withField(StandardField.TITLE, "Extending XP practices to support security requirements engineering")
+                .withField(StandardField.PAGES, "11--18");
+        BibDatabase database = new BibDatabase();
+        database.insertEntry(entry);
+
+        Layout l = style.getReferenceFormat(new UnknownEntryType("default"));
         l.setPostFormatter(new OOPreFormatter());
-        BibEntry entry = db.getEntryByKey("1137631").get();
         assertEquals(
                 "Boström, G.; Wäyrynen, J.; Bodén, M.; Beznosov, K. and Kruchten, P. (<b>2006</b>). <i>Extending XP practices to support security requirements engineering</i>,   : 11-18.",
-                l.doLayout(entry, db));
+                l.doLayout(entry, database));
 
-        l = style.getReferenceFormat("incollection");
+        l = style.getReferenceFormat(StandardEntryType.InCollection);
         l.setPostFormatter(new OOPreFormatter());
         assertEquals(
                 "Boström, G.; Wäyrynen, J.; Bodén, M.; Beznosov, K. and Kruchten, P. (<b>2006</b>). <i>Extending XP practices to support security requirements engineering</i>. In:  (Ed.), <i>SESS '06: Proceedings of the 2006 international workshop on Software engineering for secure systems</i>, ACM.",
-                l.doLayout(entry, db));
+                l.doLayout(entry, database));
     }
 
     @Test
-    public void testInstitutionAuthor() throws IOException {
-        OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
-                layoutFormatterPreferences);
+    void testInstitutionAuthor() throws IOException {
+        OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH, layoutFormatterPreferences);
         BibDatabase database = new BibDatabase();
 
-        Layout l = style.getReferenceFormat("article");
+        Layout l = style.getReferenceFormat(StandardEntryType.Article);
         l.setPostFormatter(new OOPreFormatter());
 
         BibEntry entry = new BibEntry();
-        entry.setType("article");
-        entry.setField("author", "{JabRef Development Team}");
-        entry.setField("title", "JabRef Manual");
-        entry.setField("year", "2016");
+        entry.setType(StandardEntryType.Article);
+        entry.setField(StandardField.AUTHOR, "{JabRef Development Team}");
+        entry.setField(StandardField.TITLE, "JabRef Manual");
+        entry.setField(StandardField.YEAR, "2016");
         database.insertEntry(entry);
         assertEquals("<b>JabRef Development Team</b> (<b>2016</b>). <i>JabRef Manual</i>,  .",
                 l.doLayout(entry, database));
     }
 
     @Test
-    public void testVonAuthor() throws IOException {
+    void testVonAuthor() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
         BibDatabase database = new BibDatabase();
 
-        Layout l = style.getReferenceFormat("article");
+        Layout l = style.getReferenceFormat(StandardEntryType.Article);
         l.setPostFormatter(new OOPreFormatter());
 
         BibEntry entry = new BibEntry();
-        entry.setType("article");
-        entry.setField("author", "Alpha von Beta");
-        entry.setField("title", "JabRef Manual");
-        entry.setField("year", "2016");
+        entry.setType(StandardEntryType.Article);
+        entry.setField(StandardField.AUTHOR, "Alpha von Beta");
+        entry.setField(StandardField.TITLE, "JabRef Manual");
+        entry.setField(StandardField.YEAR, "2016");
         database.insertEntry(entry);
         assertEquals("<b>von Beta, A.</b> (<b>2016</b>). <i>JabRef Manual</i>,  .",
                 l.doLayout(entry, database));
     }
 
     @Test
-    public void testInstitutionAuthorMarker() throws IOException {
+    void testInstitutionAuthorMarker() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
 
@@ -229,10 +225,10 @@ public class OOBibStyleTest {
         BibDatabase database = new BibDatabase();
 
         BibEntry entry = new BibEntry();
-        entry.setType("article");
-        entry.setField("author", "{JabRef Development Team}");
-        entry.setField("title", "JabRef Manual");
-        entry.setField("year", "2016");
+        entry.setType(StandardEntryType.Article);
+        entry.setField(StandardField.AUTHOR, "{JabRef Development Team}");
+        entry.setField(StandardField.TITLE, "JabRef Manual");
+        entry.setField(StandardField.YEAR, "2016");
         database.insertEntry(entry);
         entries.add(entry);
         entryDBMap.put(entry, database);
@@ -240,7 +236,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testVonAuthorMarker() throws IOException {
+    void testVonAuthorMarker() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
 
@@ -249,10 +245,10 @@ public class OOBibStyleTest {
         BibDatabase database = new BibDatabase();
 
         BibEntry entry = new BibEntry();
-        entry.setType("article");
-        entry.setField("author", "Alpha von Beta");
-        entry.setField("title", "JabRef Manual");
-        entry.setField("year", "2016");
+        entry.setType(StandardEntryType.Article);
+        entry.setField(StandardField.AUTHOR, "Alpha von Beta");
+        entry.setField(StandardField.TITLE, "JabRef Manual");
+        entry.setField(StandardField.YEAR, "2016");
         database.insertEntry(entry);
         entries.add(entry);
         entryDBMap.put(entry, database);
@@ -260,7 +256,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testNullAuthorMarker() throws IOException {
+    void testNullAuthorMarker() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
 
@@ -269,8 +265,8 @@ public class OOBibStyleTest {
         BibDatabase database = new BibDatabase();
 
         BibEntry entry = new BibEntry();
-        entry.setType("article");
-        entry.setField("year", "2016");
+        entry.setType(StandardEntryType.Article);
+        entry.setField(StandardField.YEAR, "2016");
         database.insertEntry(entry);
         entries.add(entry);
         entryDBMap.put(entry, database);
@@ -278,7 +274,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testNullYearMarker() throws IOException {
+    void testNullYearMarker() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
 
@@ -287,8 +283,8 @@ public class OOBibStyleTest {
         BibDatabase database = new BibDatabase();
 
         BibEntry entry = new BibEntry();
-        entry.setType("article");
-        entry.setField("author", "Alpha von Beta");
+        entry.setType(StandardEntryType.Article);
+        entry.setField(StandardField.AUTHOR, "Alpha von Beta");
         database.insertEntry(entry);
         entries.add(entry);
         entryDBMap.put(entry, database);
@@ -296,7 +292,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testEmptyEntryMarker() throws IOException {
+    void testEmptyEntryMarker() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
 
@@ -305,7 +301,7 @@ public class OOBibStyleTest {
         BibDatabase database = new BibDatabase();
 
         BibEntry entry = new BibEntry();
-        entry.setType("article");
+        entry.setType(StandardEntryType.Article);
         database.insertEntry(entry);
         entries.add(entry);
         entryDBMap.put(entry, database);
@@ -313,7 +309,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testGetCitationMarkerInParenthesisUniquefiers() throws IOException {
+    void testGetCitationMarkerInParenthesisUniquefiers() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
 
@@ -322,20 +318,20 @@ public class OOBibStyleTest {
         BibDatabase database = new BibDatabase();
 
         BibEntry entry1 = new BibEntry();
-        entry1.setField("author", "Alpha Beta");
-        entry1.setField("title", "Paper 1");
-        entry1.setField("year", "2000");
+        entry1.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry1.setField(StandardField.TITLE, "Paper 1");
+        entry1.setField(StandardField.YEAR, "2000");
         entries.add(entry1);
         database.insertEntry(entry1);
         BibEntry entry3 = new BibEntry();
-        entry3.setField("author", "Alpha Beta");
-        entry3.setField("title", "Paper 2");
-        entry3.setField("year", "2000");
+        entry3.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry3.setField(StandardField.TITLE, "Paper 2");
+        entry3.setField(StandardField.YEAR, "2000");
         entries.add(entry3);
         database.insertEntry(entry3);
         BibEntry entry2 = new BibEntry();
-        entry2.setField("author", "Gamma Epsilon");
-        entry2.setField("year", "2001");
+        entry2.setField(StandardField.AUTHOR, "Gamma Epsilon");
+        entry2.setField(StandardField.YEAR, "2001");
         entries.add(entry2);
         database.insertEntry(entry2);
         for (BibEntry entry : database.getEntries()) {
@@ -345,11 +341,11 @@ public class OOBibStyleTest {
         assertEquals("[Beta, 2000; Beta, 2000; Epsilon, 2001]",
                 style.getCitationMarker(entries, entryDBMap, true, null, null));
         assertEquals("[Beta, 2000a,b; Epsilon, 2001]",
-                style.getCitationMarker(entries, entryDBMap, true, new String[] {"a", "b", ""}, new int[] {1, 1, 1}));
+                style.getCitationMarker(entries, entryDBMap, true, new String[]{"a", "b", ""}, new int[]{1, 1, 1}));
     }
 
     @Test
-    public void testGetCitationMarkerInTextUniquefiers() throws IOException {
+    void testGetCitationMarkerInTextUniquefiers() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
 
@@ -358,20 +354,20 @@ public class OOBibStyleTest {
         BibDatabase database = new BibDatabase();
 
         BibEntry entry1 = new BibEntry();
-        entry1.setField("author", "Alpha Beta");
-        entry1.setField("title", "Paper 1");
-        entry1.setField("year", "2000");
+        entry1.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry1.setField(StandardField.TITLE, "Paper 1");
+        entry1.setField(StandardField.YEAR, "2000");
         entries.add(entry1);
         database.insertEntry(entry1);
         BibEntry entry3 = new BibEntry();
-        entry3.setField("author", "Alpha Beta");
-        entry3.setField("title", "Paper 2");
-        entry3.setField("year", "2000");
+        entry3.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry3.setField(StandardField.TITLE, "Paper 2");
+        entry3.setField(StandardField.YEAR, "2000");
         entries.add(entry3);
         database.insertEntry(entry3);
         BibEntry entry2 = new BibEntry();
-        entry2.setField("author", "Gamma Epsilon");
-        entry2.setField("year", "2001");
+        entry2.setField(StandardField.AUTHOR, "Gamma Epsilon");
+        entry2.setField(StandardField.YEAR, "2001");
         entries.add(entry2);
         database.insertEntry(entry2);
         for (BibEntry entry : database.getEntries()) {
@@ -381,11 +377,11 @@ public class OOBibStyleTest {
         assertEquals("Beta [2000]; Beta [2000]; Epsilon [2001]",
                 style.getCitationMarker(entries, entryDBMap, false, null, null));
         assertEquals("Beta [2000a,b]; Epsilon [2001]",
-                style.getCitationMarker(entries, entryDBMap, false, new String[] {"a", "b", ""}, new int[] {1, 1, 1}));
+                style.getCitationMarker(entries, entryDBMap, false, new String[]{"a", "b", ""}, new int[]{1, 1, 1}));
     }
 
     @Test
-    public void testGetCitationMarkerInParenthesisUniquefiersThreeSameAuthor() throws IOException {
+    void testGetCitationMarkerInParenthesisUniquefiersThreeSameAuthor() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
 
@@ -394,21 +390,21 @@ public class OOBibStyleTest {
         BibDatabase database = new BibDatabase();
 
         BibEntry entry1 = new BibEntry();
-        entry1.setField("author", "Alpha Beta");
-        entry1.setField("title", "Paper 1");
-        entry1.setField("year", "2000");
+        entry1.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry1.setField(StandardField.TITLE, "Paper 1");
+        entry1.setField(StandardField.YEAR, "2000");
         entries.add(entry1);
         database.insertEntry(entry1);
         BibEntry entry2 = new BibEntry();
-        entry2.setField("author", "Alpha Beta");
-        entry2.setField("title", "Paper 2");
-        entry2.setField("year", "2000");
+        entry2.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry2.setField(StandardField.TITLE, "Paper 2");
+        entry2.setField(StandardField.YEAR, "2000");
         entries.add(entry2);
         database.insertEntry(entry2);
         BibEntry entry3 = new BibEntry();
-        entry3.setField("author", "Alpha Beta");
-        entry3.setField("title", "Paper 3");
-        entry3.setField("year", "2000");
+        entry3.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry3.setField(StandardField.TITLE, "Paper 3");
+        entry3.setField(StandardField.YEAR, "2000");
         entries.add(entry3);
         database.insertEntry(entry3);
         for (BibEntry entry : database.getEntries()) {
@@ -416,11 +412,11 @@ public class OOBibStyleTest {
         }
 
         assertEquals("[Beta, 2000a,b,c]",
-                style.getCitationMarker(entries, entryDBMap, true, new String[] {"a", "b", "c"}, new int[] {1, 1, 1}));
+                style.getCitationMarker(entries, entryDBMap, true, new String[]{"a", "b", "c"}, new int[]{1, 1, 1}));
     }
 
     @Test
-    public void testGetCitationMarkerInTextUniquefiersThreeSameAuthor() throws IOException {
+    void testGetCitationMarkerInTextUniquefiersThreeSameAuthor() throws IOException {
         OOBibStyle style = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
 
@@ -429,21 +425,21 @@ public class OOBibStyleTest {
         BibDatabase database = new BibDatabase();
 
         BibEntry entry1 = new BibEntry();
-        entry1.setField("author", "Alpha Beta");
-        entry1.setField("title", "Paper 1");
-        entry1.setField("year", "2000");
+        entry1.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry1.setField(StandardField.TITLE, "Paper 1");
+        entry1.setField(StandardField.YEAR, "2000");
         entries.add(entry1);
         database.insertEntry(entry1);
         BibEntry entry2 = new BibEntry();
-        entry2.setField("author", "Alpha Beta");
-        entry2.setField("title", "Paper 2");
-        entry2.setField("year", "2000");
+        entry2.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry2.setField(StandardField.TITLE, "Paper 2");
+        entry2.setField(StandardField.YEAR, "2000");
         entries.add(entry2);
         database.insertEntry(entry2);
         BibEntry entry3 = new BibEntry();
-        entry3.setField("author", "Alpha Beta");
-        entry3.setField("title", "Paper 3");
-        entry3.setField("year", "2000");
+        entry3.setField(StandardField.AUTHOR, "Alpha Beta");
+        entry3.setField(StandardField.TITLE, "Paper 3");
+        entry3.setField(StandardField.YEAR, "2000");
         entries.add(entry3);
         database.insertEntry(entry3);
         for (BibEntry entry : database.getEntries()) {
@@ -451,12 +447,12 @@ public class OOBibStyleTest {
         }
 
         assertEquals("Beta [2000a,b,c]",
-                style.getCitationMarker(entries, entryDBMap, false, new String[] {"a", "b", "c"}, new int[] {1, 1, 1}));
+                style.getCitationMarker(entries, entryDBMap, false, new String[]{"a", "b", "c"}, new int[]{1, 1, 1}));
     }
 
     @Test
     // TODO: equals only work when initialized from file, not from reader
-    public void testEquals() throws IOException {
+    void testEquals() throws IOException {
         OOBibStyle style1 = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
         OOBibStyle style2 = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
@@ -466,7 +462,7 @@ public class OOBibStyleTest {
 
     @Test
     // TODO: equals only work when initialized from file, not from reader
-    public void testNotEquals() throws IOException {
+    void testNotEquals() throws IOException {
         OOBibStyle style1 = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
         OOBibStyle style2 = new OOBibStyle(StyleLoader.DEFAULT_AUTHORYEAR_STYLE_PATH,
@@ -475,7 +471,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testCompareToEqual() throws IOException {
+    void testCompareToEqual() throws IOException {
         OOBibStyle style1 = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
         OOBibStyle style2 = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
@@ -484,7 +480,7 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testCompareToNotEqual() throws IOException {
+    void testCompareToNotEqual() throws IOException {
         OOBibStyle style1 = new OOBibStyle(StyleLoader.DEFAULT_NUMERICAL_STYLE_PATH,
                 layoutFormatterPreferences);
         OOBibStyle style2 = new OOBibStyle(StyleLoader.DEFAULT_AUTHORYEAR_STYLE_PATH,
@@ -494,17 +490,17 @@ public class OOBibStyleTest {
     }
 
     @Test
-    public void testEmptyStringPropertyAndOxfordComma() throws URISyntaxException, IOException {
+    void testEmptyStringPropertyAndOxfordComma() throws URISyntaxException, IOException {
         OOBibStyle style = new OOBibStyle("test.jstyle", layoutFormatterPreferences);
         Map<BibEntry, BibDatabase> entryDBMap = new HashMap<>();
         List<BibEntry> entries = new ArrayList<>();
         BibDatabase database = new BibDatabase();
 
         BibEntry entry = new BibEntry();
-        entry.setType("article");
-        entry.setField("author", "Alpha von Beta and Gamma Epsilon and Ypsilon Tau");
-        entry.setField("title", "JabRef Manual");
-        entry.setField("year", "2016");
+        entry.setType(StandardEntryType.Article);
+        entry.setField(StandardField.AUTHOR, "Alpha von Beta and Gamma Epsilon and Ypsilon Tau");
+        entry.setField(StandardField.TITLE, "JabRef Manual");
+        entry.setField(StandardField.YEAR, "2016");
         database.insertEntry(entry);
         entries.add(entry);
         entryDBMap.put(entry, database);

@@ -14,6 +14,7 @@ import org.jabref.gui.autocompleter.AutoCompleteSuggestionProvider;
 import org.jabref.logic.integrity.FieldCheckers;
 import org.jabref.model.database.BibDatabaseContext;
 import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
 import org.jabref.preferences.JabRefPreferences;
 
 import com.airhacks.afterburner.views.ViewLoader;
@@ -23,19 +24,19 @@ public class BibtexKeyEditor extends HBox implements FieldEditorFX {
     private final JabRefPreferences preferences;
     @FXML private BibtexKeyEditorViewModel viewModel;
     @FXML private Button generateCiteKeyButton;
-    @FXML private EditorTextArea textArea;
+    @FXML private EditorTextField textField;
 
-    public BibtexKeyEditor(String fieldName, JabRefPreferences preferences, AutoCompleteSuggestionProvider<?> suggestionProvider, FieldCheckers fieldCheckers, BibDatabaseContext databaseContext, UndoManager undoManager, DialogService dialogService) {
+    public BibtexKeyEditor(Field field, JabRefPreferences preferences, AutoCompleteSuggestionProvider<?> suggestionProvider, FieldCheckers fieldCheckers, BibDatabaseContext databaseContext, UndoManager undoManager, DialogService dialogService) {
         this.preferences = preferences;
-        this.viewModel = new BibtexKeyEditorViewModel(fieldName, suggestionProvider, fieldCheckers, preferences.getEntryEditorPreferences(), databaseContext, undoManager, dialogService);
+        this.viewModel = new BibtexKeyEditorViewModel(field, suggestionProvider, fieldCheckers, preferences.getEntryEditorPreferences(), databaseContext, undoManager, dialogService);
 
         ViewLoader.view(this)
                   .root(this)
                   .load();
 
-        textArea.textProperty().bindBidirectional(viewModel.textProperty());
+        textField.textProperty().bindBidirectional(viewModel.textProperty());
 
-        new EditorValidator(preferences).configureValidation(viewModel.getFieldValidator().getValidationStatus(), textArea);
+        new EditorValidator(preferences).configureValidation(viewModel.getFieldValidator().getValidationStatus(), textField);
     }
 
     public BibtexKeyEditorViewModel getViewModel() {

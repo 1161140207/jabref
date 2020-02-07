@@ -1,3 +1,8 @@
+#groupTree:focused,
+#groupTree:filled:selected {
+    -fx-background-color: -jr-sidepane-background;
+}
+
 .tree-table-view, .tree-table-row-cell {
     -fx-background-color: -jr-sidepane-background;
     -fx-table-cell-border-color: transparent; /* hide grid lines */
@@ -15,21 +20,13 @@
 .numberColumn > .hits {
     -fx-font-size: 85%;
     -fx-background-color: -jr-group-hits-bg;
-    -fx-padding: 0.1em 0.4em 0.1em 0.4em;
+    -fx-padding: 0.4em 0.4em 0.4em 0.4em;
     -fx-background-insets: 0;
     -fx-background-radius: 0.8em;
 }
 
 .numberColumn > .hits .text {
     -fx-fill: -jr-group-hits-fg;
-}
-
-.numberColumn > .hits:any-selected {
-    -fx-background-color: derive(-jr-green, 70%);
-}
-
-.numberColumn > .hits:all-selected {
-    -fx-background-color: -jr-green;
 }
 
 .disclosureNodeColumn {
@@ -44,8 +41,9 @@
 
 .tree-table-row-cell:dragOver-center {
     -fx-border-color: -jr-drag-target;
-    -fx-border-width: 2 2 2 2;
-    -fx-padding: -2 -2 -2 -2;
+    -fx-border-width: 1 1 1 1;
+    -fx-padding: -1 -1 -1 -1;
+    -fx-background-color: -jr-drag-target-hover;
 }
 
 .tree-table-row-cell:dragOver-top {

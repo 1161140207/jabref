@@ -8,8 +8,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.jabref.logic.formatter.bibtexfields.ClearFormatter;
@@ -23,10 +21,15 @@ import org.jabref.logic.importer.fileformat.BibtexParser;
 import org.jabref.logic.util.OS;
 import org.jabref.model.cleanup.FieldFormatterCleanup;
 import org.jabref.model.entry.BibEntry;
-import org.jabref.model.entry.FieldName;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
 import org.jabref.model.util.DummyFileUpdateMonitor;
 
 import org.apache.http.client.utils.URIBuilder;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 /**
  * Fetches data from the INSPIRE database.
@@ -71,12 +74,15 @@ public class INSPIREFetcher implements SearchBasedParserFetcher {
             String response = new BufferedReader(new InputStreamReader(inputStream)).lines().collect(Collectors.joining(OS.NEWLINE));
 
             List<BibEntry> entries = new ArrayList<>();
-            BibtexParser bibtexParser = new BibtexParser(preferences, new DummyFileUpdateMonitor());
-            Pattern pattern = Pattern.compile("<pre>(?s)(.*)</pre>");
-            Matcher matcher = pattern.matcher(response);
-            while (matcher.find()) {
-                String bibtexEntryString = matcher.group(1);
-                entries.addAll(bibtexParser.parseEntries(bibtexEntryString));
+
+            Document doc = Jsoup.parse(response);
+            Elements preElements = doc.getElementsByTag("pre");
+
+            for (Element elem : preElements) {
+                //We have to use a new instance here, because otherwise only the first entry gets parsed
+                BibtexParser bibtexParser = new BibtexParser(preferences, new DummyFileUpdateMonitor());
+                List<BibEntry> entry = bibtexParser.parseEntries(elem.text());
+                entries.addAll(entry);
             }
             return entries;
         };
@@ -85,9 +91,9 @@ public class INSPIREFetcher implements SearchBasedParserFetcher {
     @Override
     public void doPostCleanup(BibEntry entry) {
         // Remove strange "SLACcitation" field
-        new FieldFormatterCleanup("SLACcitation", new ClearFormatter()).cleanup(entry);
+        new FieldFormatterCleanup(new UnknownField("SLACcitation"), new ClearFormatter()).cleanup(entry);
 
         // Remove braces around content of "title" field
-        new FieldFormatterCleanup(FieldName.TITLE, new RemoveBracesFormatter()).cleanup(entry);
+        new FieldFormatterCleanup(StandardField.TITLE, new RemoveBracesFormatter()).cleanup(entry);
     }
 }

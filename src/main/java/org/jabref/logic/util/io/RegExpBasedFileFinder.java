@@ -3,6 +3,7 @@ package org.jabref.logic.util.io;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -48,7 +49,7 @@ class RegExpBasedFileFinder implements FileFinder {
     public static String expandBrackets(String bracketString, BibEntry entry, BibDatabase database,
                                         Character keywordDelimiter) {
         Matcher matcher = SQUARE_BRACKETS_PATTERN.matcher(bracketString);
-        StringBuffer expandedStringBuffer = new StringBuffer();
+        StringBuilder expandedStringBuffer = new StringBuilder();
         while (matcher.find()) {
             String replacement = BracketedPattern.expandBrackets(matcher.group(), keywordDelimiter, entry, database);
             matcher.appendReplacement(expandedStringBuffer, replacement);
@@ -129,7 +130,7 @@ class RegExpBasedFileFinder implements FileFinder {
 
         // Escape handling...
         Matcher m = ESCAPE_PATTERN.matcher(fileName);
-        StringBuffer s = new StringBuffer();
+        StringBuilder s = new StringBuilder();
         while (m.find()) {
             m.appendReplacement(s, m.group(1) + '/' + m.group(2));
         }
@@ -201,7 +202,7 @@ class RegExpBasedFileFinder implements FileFinder {
     }
 
     private List<Path> collectFilesWithMatcher(Path actualDirectory, BiPredicate<Path, BasicFileAttributes> matcher) {
-        try (Stream<Path> pathStream = Files.find(actualDirectory, 1, matcher)) {
+        try (Stream<Path> pathStream = Files.find(actualDirectory, 1, matcher, FileVisitOption.FOLLOW_LINKS)) {
             return pathStream.collect(Collectors.toList());
         } catch (UncheckedIOException | IOException ioe) {
             return Collections.emptyList();

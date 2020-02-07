@@ -1,9 +1,5 @@
 package org.jabref.model.entry;
 
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.Locale;
 import java.util.Optional;
 
 import org.jabref.model.strings.StringUtil;
@@ -37,7 +33,6 @@ public enum Month {
         this.twoDigitNumber = String.format("%02d", number);
         this.number = number;
     }
-
 
     /**
      * Find month by one-based number.
@@ -111,22 +106,52 @@ public enum Month {
      * Parses a month having the string in German standard form such as
      * "Oktober" or in German short form such as "Okt"
      *
-     * @param value,
-     *            a String that represents a month in German form
+     * @param value a String that represents a month in German form
      * @return the corresponding month instance, empty if input is not in German
      *         form
      */
     private static Optional<Month> parseGermanShortMonth(String value) {
-        if ("Mae".equalsIgnoreCase(value) || "Maerz".equalsIgnoreCase(value) || "Mär".equalsIgnoreCase(value)) {
-            return Month.getMonthByNumber(3);
-        }
-
-        try {
-            YearMonth yearMonth = YearMonth.parse("1969-" + StringUtil.capitalizeFirst(value),
-                    DateTimeFormatter.ofPattern("yyyy-MMM", Locale.GERMAN));
-            return Month.getMonthByNumber(yearMonth.getMonthValue());
-        } catch (DateTimeParseException e) {
-            return Optional.empty();
+        value = value.toLowerCase();
+        switch (value) {
+            case "jan":
+            case "januar":
+                return Month.getMonthByNumber(1);
+            case "feb":
+            case "februar":
+                return Month.getMonthByNumber(2);
+            case "mär":
+            case "mae":
+            case "märz":
+            case "maerz":
+                return Month.getMonthByNumber(3);
+            case "apr":
+            case "april":
+                return Month.getMonthByNumber(4);
+            case "mai":
+                return Month.getMonthByNumber(5);
+            case "jun":
+            case "juni":
+                return Month.getMonthByNumber(6);
+            case "jul":
+            case "juli":
+                return Month.getMonthByNumber(7);
+            case "aug":
+            case "august":
+                return Month.getMonthByNumber(8);
+            case "sep":
+            case "september":
+                return Month.getMonthByNumber(9);
+            case "okt":
+            case "oktober":
+                return Month.getMonthByNumber(10);
+            case "nov":
+            case "november":
+                return Month.getMonthByNumber(11);
+            case "dez":
+            case "dezember":
+                return Month.getMonthByNumber(12);
+            default:
+                return Optional.empty();
         }
     }
 
@@ -143,8 +168,9 @@ public enum Month {
      * Returns the month in JabRef format. The format is the short 3-digit name surrounded by a '#'.
      * Example: #jan#, #feb#, etc.
      *
-     * See https://github.com/JabRef/jabref/issues/263#issuecomment-151246595 for a discussion on that thing.
-     * This seems to be an <em>invalid</em> format in terms of plain BiBTeX, but a <em>valid</em> format in the case of JabRef
+     * See <a href="https://github.com/JabRef/jabref/issues/263#issuecomment-151246595">Issue 263</a> for a discussion on that thing.
+     * This seems to be an <em>invalid</em> format in terms of plain BiBTeX, but a <em>valid</em> format in the case of JabRef.
+     * The documentation is available at the <a href="https://docs.jabref.org/fields/strings">Strings help</a> of JabRef.
      *
      * @return Month in JabRef format
      */

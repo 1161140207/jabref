@@ -9,11 +9,18 @@ import java.util.Set;
 import java.util.function.UnaryOperator;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
+import java.util.stream.Collectors;
+
+import javafx.scene.control.TableColumn;
 
 import org.jabref.Globals;
 import org.jabref.JabRefMain;
+import org.jabref.gui.maintable.ColumnPreferences;
+import org.jabref.gui.maintable.MainTableColumnModel;
 import org.jabref.model.bibtexkeypattern.GlobalBibtexKeyPattern;
-import org.jabref.model.entry.FieldName;
+import org.jabref.model.entry.field.SpecialField;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.types.EntryTypeFactory;
 import org.jabref.preferences.JabRefPreferences;
 
 import org.slf4j.Logger;
@@ -30,7 +37,6 @@ public class PreferencesMigrations {
      * Perform checks and changes for users with a preference set from an older JabRef version.
      */
     public static void runMigrations() {
-
         Preferences mainPrefsNode = Preferences.userNodeForPackage(JabRefMain.class);
 
         upgradePrefsToOrgJabRef(mainPrefsNode);
@@ -38,10 +44,11 @@ public class PreferencesMigrations {
         upgradeFaultyEncodingStrings(Globals.prefs);
         upgradeLabelPatternToBibtexKeyPattern(Globals.prefs);
         upgradeImportFileAndDirePatterns(Globals.prefs, mainPrefsNode);
-        upgradeStoredCustomEntryTypes(Globals.prefs, mainPrefsNode);
+        upgradeStoredBibEntryTypes(Globals.prefs, mainPrefsNode);
         upgradeKeyBindingsToJavaFX(Globals.prefs);
         addCrossRefRelatedFieldsForAutoComplete(Globals.prefs);
         upgradePreviewStyleFromReviewToComment(Globals.prefs);
+        upgradeColumnPreferences(Globals.prefs);
     }
 
     /**
@@ -127,18 +134,18 @@ public class PreferencesMigrations {
         if (prefs.get(JabRefPreferences.EXPORT_IN_SPECIFIED_ORDER, null) == null) {
             if (prefs.getBoolean("exportInStandardOrder", false)) {
                 prefs.putBoolean(JabRefPreferences.EXPORT_IN_SPECIFIED_ORDER, true);
-                prefs.put(JabRefPreferences.EXPORT_PRIMARY_SORT_FIELD, FieldName.AUTHOR);
-                prefs.put(JabRefPreferences.EXPORT_SECONDARY_SORT_FIELD, FieldName.EDITOR);
-                prefs.put(JabRefPreferences.EXPORT_TERTIARY_SORT_FIELD, FieldName.YEAR);
+                prefs.put(JabRefPreferences.EXPORT_PRIMARY_SORT_FIELD, StandardField.AUTHOR.getName());
+                prefs.put(JabRefPreferences.EXPORT_SECONDARY_SORT_FIELD, StandardField.EDITOR.getName());
+                prefs.put(JabRefPreferences.EXPORT_TERTIARY_SORT_FIELD, StandardField.YEAR.getName());
                 prefs.putBoolean(JabRefPreferences.EXPORT_PRIMARY_SORT_DESCENDING, false);
                 prefs.putBoolean(JabRefPreferences.EXPORT_SECONDARY_SORT_DESCENDING, false);
                 prefs.putBoolean(JabRefPreferences.EXPORT_TERTIARY_SORT_DESCENDING, false);
             } else if (prefs.getBoolean("exportInTitleOrder", false)) {
                 // exportInTitleOrder => title, author, editor
                 prefs.putBoolean(JabRefPreferences.EXPORT_IN_SPECIFIED_ORDER, true);
-                prefs.put(JabRefPreferences.EXPORT_PRIMARY_SORT_FIELD, FieldName.TITLE);
-                prefs.put(JabRefPreferences.EXPORT_SECONDARY_SORT_FIELD, FieldName.AUTHOR);
-                prefs.put(JabRefPreferences.EXPORT_TERTIARY_SORT_FIELD, FieldName.EDITOR);
+                prefs.put(JabRefPreferences.EXPORT_PRIMARY_SORT_FIELD, StandardField.TITLE.getName());
+                prefs.put(JabRefPreferences.EXPORT_SECONDARY_SORT_FIELD, StandardField.AUTHOR.getName());
+                prefs.put(JabRefPreferences.EXPORT_TERTIARY_SORT_FIELD, StandardField.EDITOR.getName());
                 prefs.putBoolean(JabRefPreferences.EXPORT_PRIMARY_SORT_DESCENDING, false);
                 prefs.putBoolean(JabRefPreferences.EXPORT_SECONDARY_SORT_DESCENDING, false);
                 prefs.putBoolean(JabRefPreferences.EXPORT_TERTIARY_SORT_DESCENDING, false);
@@ -149,7 +156,7 @@ public class PreferencesMigrations {
     /**
      * Migrate all customized entry types from versions <=3.7
      */
-    private static void upgradeStoredCustomEntryTypes(JabRefPreferences prefs, Preferences mainPrefsNode) {
+    private static void upgradeStoredBibEntryTypes(JabRefPreferences prefs, Preferences mainPrefsNode) {
 
         try {
             if (mainPrefsNode.nodeExists(JabRefPreferences.CUSTOMIZED_BIBTEX_TYPES) ||
@@ -157,7 +164,7 @@ public class PreferencesMigrations {
                 // skip further processing as prefs already have been migrated
             } else {
                 LOGGER.info("Migrating old custom entry types.");
-                CustomEntryTypePreferenceMigration.upgradeStoredCustomEntryTypes(prefs.getDefaultBibDatabaseMode());
+                CustomEntryTypePreferenceMigration.upgradeStoredBibEntryTypes(prefs.getDefaultBibDatabaseMode());
             }
         } catch (BackingStoreException ex) {
             LOGGER.error("Migrating old custom entry types failed.", ex);
@@ -237,9 +244,15 @@ public class PreferencesMigrations {
             String[] oldStylePatterns = new String[] {"\\bibtexkey",
                                                       "\\bibtexkey\\begin{title} - \\format[RemoveBrackets]{\\title}\\end{title}"};
             String[] newStylePatterns = new String[] {"[bibtexkey]",
-                                                      "[bibtexkey] - [fulltitle]"};
+                                                      "[bibtexkey] - [title]"};
+
+            String[] oldDisplayStylePattern = new String[] {"bibtexkey", "bibtexkey - title",};
+
             for (int i = 0; i < oldStylePatterns.length; i++) {
                 migrateFileImportPattern(oldStylePatterns[i], newStylePatterns[i], prefs, mainPrefsNode);
+            }
+            for (int i = 0; i < oldDisplayStylePattern.length; i++) {
+                migrateFileImportPattern(oldDisplayStylePattern[i], newStylePatterns[i], prefs, mainPrefsNode);
             }
         }
         // Directory preferences are not yet migrated, since it is not quote clear how to parse and reinterpret
@@ -277,7 +290,7 @@ public class PreferencesMigrations {
         GlobalBibtexKeyPattern keyPattern = GlobalBibtexKeyPattern.fromPattern(
                                                                                prefs.get(JabRefPreferences.DEFAULT_BIBTEX_KEY_PATTERN));
         for (String key : oldPatternPrefs.keys()) {
-            keyPattern.addBibtexKeyPattern(key, oldPatternPrefs.get(key, null));
+            keyPattern.addBibtexKeyPattern(EntryTypeFactory.parse(key), oldPatternPrefs.get(key, null));
         }
         prefs.putKeyPattern(keyPattern);
     }
@@ -286,5 +299,69 @@ public class PreferencesMigrations {
         String currentPreviewStyle = prefs.getPreviewStyle();
         String migratedStyle = currentPreviewStyle.replace("\\begin{review}<BR><BR><b>Review: </b> \\format[HTMLChars]{\\review} \\end{review}", "\\begin{comment}<BR><BR><b>Comment: </b> \\format[HTMLChars]{\\comment} \\end{comment}");
         prefs.setPreviewStyle(migratedStyle);
+    }
+
+    /**
+     * The former preferences default of columns was a simple list of strings ("author;title;year;..."). Since 5.0
+     * the preferences store the type of the column too, so that the formerly hardwired columns like the graphic groups
+     * column or the other icon columns can be reordered in the main table and behave like any other field column
+     * ("groups;linked_id;field:author;special:readstatus;extrafile:pdf;...").
+     *
+     * Simple strings are by default parsed as a FieldColumn, so there is nothing to do there, but the formerly hard
+     * wired columns need to be added.
+     */
+    static void upgradeColumnPreferences(JabRefPreferences preferences) {
+        List<String> columnNames = preferences.getStringList(JabRefPreferences.COLUMN_NAMES);
+        List<Double> columnWidths = preferences.getStringList(JabRefPreferences.COLUMN_WIDTHS)
+                                               .stream()
+                                               .map(string -> {
+                                                   try {
+                                                       return Double.parseDouble(string);
+                                                   } catch (NumberFormatException e) {
+                                                       return ColumnPreferences.DEFAULT_COLUMN_WIDTH;
+                                                   }
+                                               })
+                                               .collect(Collectors.toList());
+
+        // "field:"
+        String normalFieldTypeString = MainTableColumnModel.Type.NORMALFIELD.getName() + MainTableColumnModel.COLUMNS_QUALIFIER_DELIMITER;
+
+        if (!columnNames.isEmpty() && columnNames.stream().noneMatch(name -> name.contains(normalFieldTypeString))) {
+            List<MainTableColumnModel> columns = new ArrayList<>();
+            columns.add(new MainTableColumnModel(MainTableColumnModel.Type.GROUPS));
+            columns.add(new MainTableColumnModel(MainTableColumnModel.Type.FILES));
+            columns.add(new MainTableColumnModel(MainTableColumnModel.Type.LINKED_IDENTIFIER));
+
+            for (int i = 0; i < columnNames.size(); i++) {
+                String name = columnNames.get(i);
+                double columnWidth = ColumnPreferences.DEFAULT_COLUMN_WIDTH;
+
+                MainTableColumnModel.Type type = SpecialField.fromName(name)
+                                                             .map(field -> MainTableColumnModel.Type.SPECIALFIELD)
+                                                             .orElse(MainTableColumnModel.Type.NORMALFIELD);
+
+                if (i < columnWidths.size()) {
+                    columnWidth = columnWidths.get(i);
+                }
+
+                columns.add(new MainTableColumnModel(type, name, columnWidth));
+            }
+
+            preferences.putStringList(JabRefPreferences.COLUMN_NAMES, columns.stream()
+                    .map(MainTableColumnModel::getName)
+                    .collect(Collectors.toList()));
+
+            preferences.putStringList(JabRefPreferences.COLUMN_WIDTHS, columns.stream()
+                    .map(MainTableColumnModel::getWidth)
+                    .map(Double::intValue)
+                    .map(Object::toString)
+                    .collect(Collectors.toList()));
+
+            // ASCENDING by default
+            preferences.putStringList(JabRefPreferences.COLUMN_SORT_TYPES, columns.stream()
+                    .map(MainTableColumnModel::getSortType)
+                    .map(TableColumn.SortType::toString)
+                    .collect(Collectors.toList()));
+        }
     }
 }

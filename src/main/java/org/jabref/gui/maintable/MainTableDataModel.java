@@ -1,11 +1,11 @@
 package org.jabref.gui.maintable;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
 import javafx.beans.binding.Bindings;
-import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
@@ -22,9 +22,10 @@ import org.jabref.model.search.matchers.MatcherSets;
 public class MainTableDataModel {
     private final FilteredList<BibEntryTableViewModel> entriesFiltered;
     private final SortedList<BibEntryTableViewModel> entriesSorted;
+    private final GroupViewMode groupViewMode;
 
     public MainTableDataModel(BibDatabaseContext context) {
-        ObservableList<BibEntry> allEntries = context.getDatabase().getEntries();
+        ObservableList<BibEntry> allEntries = BindingsHelper.forUI(context.getDatabase().getEntries());
 
         ObservableList<BibEntryTableViewModel> entriesViewModel = BindingsHelper.mapBacked(allEntries, BibEntryTableViewModel::new);
 
@@ -32,10 +33,15 @@ public class MainTableDataModel {
         entriesFiltered.predicateProperty().bind(
                 Bindings.createObjectBinding(() -> this::isMatched,
                         Globals.stateManager.activeGroupProperty(), Globals.stateManager.activeSearchQueryProperty())
+
         );
 
+        IntegerProperty resultSize = new SimpleIntegerProperty();
+        resultSize.bind(Bindings.size(entriesFiltered));
+        Globals.stateManager.setActiveSearchResultSize(context, resultSize);
         // We need to wrap the list since otherwise sorting in the table does not work
         entriesSorted = new SortedList<>(entriesFiltered);
+        groupViewMode = Globals.prefs.getGroupViewMode();
     }
 
     private boolean isMatched(BibEntryTableViewModel entry) {
@@ -60,7 +66,7 @@ public class MainTableDataModel {
             return Optional.empty();
         }
 
-        final MatcherSet searchRules = MatcherSets.build(Globals.prefs.getGroupViewMode() == GroupViewMode.INTERSECTION ? MatcherSets.MatcherType.AND : MatcherSets.MatcherType.OR);
+        final MatcherSet searchRules = MatcherSets.build(groupViewMode == GroupViewMode.INTERSECTION ? MatcherSets.MatcherType.AND : MatcherSets.MatcherType.OR);
 
         for (GroupTreeNode node : selectedGroups) {
             searchRules.addRule(node.getSearchMatcher());
@@ -68,11 +74,7 @@ public class MainTableDataModel {
         return Optional.of(searchRules);
     }
 
-    public ObservableList<BibEntryTableViewModel> getEntriesFiltered() {
+    public SortedList<BibEntryTableViewModel> getEntriesFilteredAndSorted() {
         return entriesSorted;
-    }
-
-    public void bindComparator(ReadOnlyObjectProperty<Comparator<BibEntryTableViewModel>> comparator) {
-        entriesSorted.comparatorProperty().bind(comparator);
     }
 }

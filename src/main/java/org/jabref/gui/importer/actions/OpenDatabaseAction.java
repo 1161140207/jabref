@@ -2,22 +2,15 @@ package org.jabref.gui.importer.actions;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.attribute.FileTime;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
-
-import javax.swing.SwingUtilities;
 
 import org.jabref.Globals;
-import org.jabref.JabRefExecutorService;
 import org.jabref.gui.BasePanel;
 import org.jabref.gui.BasePanelPreferences;
 import org.jabref.gui.DialogService;
@@ -27,7 +20,7 @@ import org.jabref.gui.dialogs.BackupUIManager;
 import org.jabref.gui.externalfiletype.ExternalFileTypes;
 import org.jabref.gui.importer.ParserResultWarningDialog;
 import org.jabref.gui.shared.SharedDatabaseUIManager;
-import org.jabref.gui.util.DefaultTaskExecutor;
+import org.jabref.gui.util.BackgroundTask;
 import org.jabref.gui.util.FileDialogConfiguration;
 import org.jabref.logic.autosaveandbackup.BackupManager;
 import org.jabref.logic.importer.OpenDatabase;
@@ -36,9 +29,6 @@ import org.jabref.logic.l10n.Localization;
 import org.jabref.logic.shared.exception.InvalidDBMSConnectionPropertiesException;
 import org.jabref.logic.shared.exception.NotASharedDatabaseException;
 import org.jabref.logic.util.StandardFileType;
-import org.jabref.logic.util.io.FileBasedLock;
-import org.jabref.migrations.FileLinksUpgradeWarning;
-import org.jabref.model.database.BibDatabase;
 import org.jabref.model.database.shared.DatabaseNotSupportedException;
 import org.jabref.preferences.JabRefPreferences;
 
@@ -52,21 +42,18 @@ public class OpenDatabaseAction extends SimpleCommand {
     // List of actions that may need to be called after opening the file. Such as
     // upgrade actions etc. that may depend on the JabRef version that wrote the file:
     private static final List<GUIPostOpenAction> POST_OPEN_ACTIONS = Arrays.asList(
-            // Migrations:
-            // Warning for migrating the Review into the Comment field
-            new MergeReviewIntoCommentAction(),
-            // External file handling system in version 2.3:
-            new FileLinksUpgradeWarning(),
-
-            // Check for new custom entry types loaded from the BIB file:
-            new CheckForNewEntryTypesAction(),
-            // Warning about and handling duplicate BibTeX keys:
-            new HandleDuplicateWarnings());
+                                                                                   // Migrations:
+                                                                                   // Warning for migrating the Review into the Comment field
+                                                                                   new MergeReviewIntoCommentAction(),
+                                                                                   // Check for new custom entry types loaded from the BIB file:
+                                                                                   new CheckForNewEntryTypesAction());
 
     private final JabRefFrame frame;
+    private final DialogService dialogService;
 
     public OpenDatabaseAction(JabRefFrame frame) {
         this.frame = frame;
+        this.dialogService = frame.getDialogService();
     }
 
     /**
@@ -86,18 +73,13 @@ public class OpenDatabaseAction extends SimpleCommand {
 
     @Override
     public void execute() {
-        List<Path> filesToOpen = new ArrayList<>();
-
-        DialogService ds = frame.getDialogService();
         FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()
                 .addExtensionFilter(StandardFileType.BIBTEX_DB)
                 .withDefaultExtension(StandardFileType.BIBTEX_DB)
                 .withInitialDirectory(getInitialDirectory())
                 .build();
 
-        List<Path> chosenFiles = ds.showFileOpenDialogAndGetMultipleFiles(fileDialogConfiguration);
-        filesToOpen.addAll(chosenFiles);
-
+        List<Path> filesToOpen = dialogService.showFileOpenDialogAndGetMultipleFiles(fileDialogConfiguration);
         openFiles(filesToOpen, true);
     }
 
@@ -107,15 +89,11 @@ public class OpenDatabaseAction extends SimpleCommand {
      */
     private Path getInitialDirectory() {
         if (frame.getBasePanelCount() == 0) {
-            return getWorkingDirectoryPath();
+            return Globals.prefs.getWorkingDir();
         } else {
             Optional<Path> databasePath = frame.getCurrentBasePanel().getBibDatabaseContext().getDatabasePath();
-            return databasePath.map(p -> p.getParent()).orElse(getWorkingDirectoryPath());
+            return databasePath.map(Path::getParent).orElse(Globals.prefs.getWorkingDir());
         }
-    }
-
-    private Path getWorkingDirectoryPath() {
-        return Paths.get(Globals.prefs.get(JabRefPreferences.WORKING_DIRECTORY));
     }
 
     /**
@@ -124,15 +102,7 @@ public class OpenDatabaseAction extends SimpleCommand {
      * @param file the file, may be null or not existing
      */
     public void openFile(Path file, boolean raisePanel) {
-        List<Path> filesToOpen = new ArrayList<>();
-        filesToOpen.add(file);
-        openFiles(filesToOpen, raisePanel);
-    }
-
-    public void openFilesAsStringList(List<String> fileNamesToOpen, boolean raisePanel) {
-        List<Path> filesToOpen = fileNamesToOpen.stream().map(Paths::get).collect(Collectors.toList());
-
-        openFiles(filesToOpen, raisePanel);
+        openFiles(Collections.singletonList(file), raisePanel);
     }
 
     /**
@@ -151,7 +121,7 @@ public class OpenDatabaseAction extends SimpleCommand {
             for (int i = 0; i < frame.getTabbedPane().getTabs().size(); i++) {
                 BasePanel basePanel = frame.getBasePanelAt(i);
                 if ((basePanel.getBibDatabaseContext().getDatabasePath().isPresent())
-                        && basePanel.getBibDatabaseContext().getDatabasePath().get().equals(file)) {
+                    && basePanel.getBibDatabaseContext().getDatabasePath().get().equals(file)) {
                     iterator.remove();
                     removed++;
                     // See if we removed the final one. If so, we must perhaps
@@ -169,24 +139,21 @@ public class OpenDatabaseAction extends SimpleCommand {
         // locking until the file is loaded.
         if (!filesToOpen.isEmpty()) {
             final List<Path> theFiles = Collections.unmodifiableList(filesToOpen);
-            JabRefExecutorService.INSTANCE.execute(() -> {
-                for (Path theFile : theFiles) {
-                    openTheFile(theFile, raisePanel);
-                }
-            });
+
             for (Path theFile : theFiles) {
-                frame.getFileHistory().newFile(theFile.toString());
+                //This method will execute the concrete file opening and loading in a background thread
+                openTheFile(theFile, raisePanel);
+            }
+
+            for (Path theFile : theFiles) {
+                frame.getFileHistory().newFile(theFile);
             }
         }
         // If no files are remaining to open, this could mean that a file was
         // already open. If so, we may have to raise the correct tab:
         else if (toRaise != null) {
-            frame.output(Localization.lang("File '%0' is already open.",
-                    toRaise.getBibDatabaseContext().getDatabaseFile().get().getPath()));
             frame.showBasePanel(toRaise);
         }
-
-        frame.output(Localization.lang("Files opened") + ": " + (filesToOpen.size()));
     }
 
     /**
@@ -195,96 +162,58 @@ public class OpenDatabaseAction extends SimpleCommand {
     private void openTheFile(Path file, boolean raisePanel) {
         Objects.requireNonNull(file);
         if (Files.exists(file)) {
-            Path fileToLoad = file.toAbsolutePath();
 
-            frame.output(Localization.lang("Opening") + ": '" + file + "'");
-
-            String fileName = file.getFileName().toString();
-            Globals.prefs.put(JabRefPreferences.WORKING_DIRECTORY, fileToLoad.getParent().toString());
-
-            if (FileBasedLock.hasLockFile(file)) {
-                Optional<FileTime> modificationTime = FileBasedLock.getLockFileTimeStamp(file);
-                if ((modificationTime.isPresent()) && ((System.currentTimeMillis()
-                        - modificationTime.get().toMillis()) > FileBasedLock.LOCKFILE_CRITICAL_AGE)) {
-                    // The lock file is fairly old, so we can offer to "steal" the file:
-
-                    boolean overWriteFileLockPressed = frame.getDialogService().showConfirmationDialogAndWait(Localization.lang("File locked"),
-                            Localization.lang("Error opening file") + " '" + fileName + "'. "
-                                    + Localization.lang("File is locked by another JabRef instance.") + "\n"
-                                    + Localization.lang("Do you want to override the file lock?"),
-                            Localization.lang("Overwrite file lock"),
-                            Localization.lang("Cancel"));
-
-                    if (overWriteFileLockPressed) {
-                        FileBasedLock.deleteLockFile(file);
-                    } else {
-                        return;
-                    }
-                } else if (!FileBasedLock.waitForFileLock(file)) {
-
-                    frame.getDialogService().showErrorDialogAndWait(Localization.lang("Error"),
-                            Localization.lang("Error opening file") + " '" + fileName + "'. "
-                                    + Localization.lang("File is locked by another JabRef instance."));
-
-                    return;
-                }
-            }
-
-            if (BackupManager.checkForBackupFile(fileToLoad)) {
-                BackupUIManager.showRestoreBackupDialog(frame.getDialogService(), fileToLoad);
-            }
-
-            ParserResult result;
-            result = OpenDatabase.loadDatabase(fileToLoad.toString(),
-                    Globals.prefs.getImportFormatPreferences(), Globals.getFileUpdateMonitor());
-
-            if (result.getDatabase().isShared()) {
-                try {
-                    new SharedDatabaseUIManager(frame).openSharedDatabaseFromParserResult(result);
-                } catch (SQLException | DatabaseNotSupportedException | InvalidDBMSConnectionPropertiesException |
-                        NotASharedDatabaseException e) {
-                    result.getDatabaseContext().clearDatabaseFile(); // do not open the original file
-                    result.getDatabase().clearSharedDatabaseID();
-                    LOGGER.error("Connection error", e);
-
-                    frame.getDialogService().showErrorDialogAndWait(Localization.lang("Connection error"),
-                            e.getMessage() + "\n\n" + Localization.lang("A local copy will be opened."));
-
-                }
-            }
-
-            BasePanel panel = addNewDatabase(result, file, raisePanel);
-
-            // After adding the database, go through our list and see if
-            // any post open actions need to be done. For instance, checking
-            // if we found new entry types that can be imported, or checking
-            // if the database contents should be modified due to new features
-            // in this version of JabRef:
-            final ParserResult finalReferenceToResult = result;
-            SwingUtilities.invokeLater(() -> OpenDatabaseAction.performPostOpenActions(panel, finalReferenceToResult));
+            BackgroundTask.wrap(() -> loadDatabase(file))
+                          .onSuccess(result -> {
+                              BasePanel panel = addNewDatabase(result, file, raisePanel);
+                              OpenDatabaseAction.performPostOpenActions(panel, result);
+                          })
+                          .onFailure(ex -> dialogService.showErrorDialogAndWait(Localization.lang("Connection error"),
+                                                                                           ex.getMessage() + "\n\n" + Localization.lang("A local copy will be opened.")))
+                          .executeWith(Globals.TASK_EXECUTOR);
         }
+
+    }
+
+    private ParserResult loadDatabase(Path file) throws Exception {
+        Path fileToLoad = file.toAbsolutePath();
+
+        dialogService.notify(Localization.lang("Opening") + ": '" + file + "'");
+
+        Globals.prefs.put(JabRefPreferences.WORKING_DIRECTORY, fileToLoad.getParent().toString());
+
+        if (BackupManager.checkForBackupFile(fileToLoad)) {
+            BackupUIManager.showRestoreBackupDialog(dialogService, fileToLoad);
+        }
+
+        ParserResult result = OpenDatabase.loadDatabase(fileToLoad.toString(),
+                                                        Globals.prefs.getImportFormatPreferences(), Globals.getFileUpdateMonitor());
+
+        if (result.getDatabase().isShared()) {
+            try {
+                new SharedDatabaseUIManager(frame).openSharedDatabaseFromParserResult(result);
+            } catch (SQLException | DatabaseNotSupportedException | InvalidDBMSConnectionPropertiesException |
+                     NotASharedDatabaseException e) {
+                result.getDatabaseContext().clearDatabaseFile(); // do not open the original file
+                result.getDatabase().clearSharedDatabaseID();
+                LOGGER.error("Connection error", e);
+
+                throw e;
+
+            }
+        }
+        return result;
+
     }
 
     private BasePanel addNewDatabase(ParserResult result, final Path file, boolean raisePanel) {
-
-        BibDatabase database = result.getDatabase();
-
         if (result.hasWarnings()) {
-            JabRefExecutorService.INSTANCE
-                    .execute(() -> ParserResultWarningDialog.showParserResultWarningDialog(result, frame));
+            ParserResultWarningDialog.showParserResultWarningDialog(result, frame);
         }
 
-        if (Objects.nonNull(file)) {
-            frame.output(Localization.lang("Opened library") + " '" + file.toString() + "' "
-                    + Localization.lang("with")
-                    + " "
-                    + database.getEntryCount() + " " + Localization.lang("entries") + ".");
-        }
+        BasePanel basePanel = new BasePanel(frame, BasePanelPreferences.from(Globals.prefs), result.getDatabaseContext(), ExternalFileTypes.getInstance());
+        frame.addTab(basePanel, raisePanel);
+        return basePanel;
 
-        return DefaultTaskExecutor.runInJavaFXThread(() -> {
-            BasePanel basePanel = new BasePanel(frame, BasePanelPreferences.from(Globals.prefs), result.getDatabaseContext(), ExternalFileTypes.getInstance());
-            frame.addTab(basePanel, raisePanel);
-            return basePanel;
-        });
     }
 }

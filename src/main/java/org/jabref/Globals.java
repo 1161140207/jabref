@@ -7,9 +7,9 @@ import java.util.UUID;
 import javafx.stage.Screen;
 
 import org.jabref.gui.ClipBoardManager;
-import org.jabref.gui.GlobalFocusListener;
 import org.jabref.gui.StateManager;
 import org.jabref.gui.keyboard.KeyBindingRepository;
+import org.jabref.gui.undo.CountingUndoManager;
 import org.jabref.gui.util.DefaultFileUpdateMonitor;
 import org.jabref.gui.util.DefaultTaskExecutor;
 import org.jabref.gui.util.TaskExecutor;
@@ -20,6 +20,7 @@ import org.jabref.logic.journals.JournalAbbreviationLoader;
 import org.jabref.logic.protectedterms.ProtectedTermsLoader;
 import org.jabref.logic.remote.server.RemoteListenerServerLifecycle;
 import org.jabref.logic.util.BuildInfo;
+import org.jabref.model.entry.BibEntryTypesManager;
 import org.jabref.model.util.FileUpdateMonitor;
 import org.jabref.preferences.JabRefPreferences;
 
@@ -28,40 +29,51 @@ import com.microsoft.applicationinsights.TelemetryClient;
 import com.microsoft.applicationinsights.TelemetryConfiguration;
 import com.microsoft.applicationinsights.internal.shutdown.SDKShutdownActivity;
 import com.microsoft.applicationinsights.telemetry.SessionState;
+import kong.unirest.Unirest;
 
 public class Globals {
 
-    // JabRef version info
+    /**
+     * JabRef version info
+     */
     public static final BuildInfo BUILD_INFO = new BuildInfo();
+
     // Remote listener
     public static final RemoteListenerServerLifecycle REMOTE_LISTENER = new RemoteListenerServerLifecycle();
+
     public static final ImportFormatReader IMPORT_FORMAT_READER = new ImportFormatReader();
     public static final TaskExecutor TASK_EXECUTOR = new DefaultTaskExecutor();
-    // In the main program, this field is initialized in JabRef.java
-    // Each test case initializes this field if required
+
+    /**
+     * Each test case initializes this field if required
+     */
     public static JabRefPreferences prefs;
+
     /**
      * This field is initialized upon startup.
      * Only GUI code is allowed to access it, logic code should use dependency injection.
      */
     public static JournalAbbreviationLoader journalAbbreviationLoader;
+
     /**
      * This field is initialized upon startup.
      * Only GUI code is allowed to access it, logic code should use dependency injection.
      */
     public static ProtectedTermsLoader protectedTermsLoader;
+
     /**
      * Manager for the state of the GUI.
      */
+    public static StateManager stateManager = new StateManager();
 
+    public static ExporterFactory exportFactory;
+    public static CountingUndoManager undoManager = new CountingUndoManager();
+    public static BibEntryTypesManager entryTypesManager = new BibEntryTypesManager();
     public static ClipBoardManager clipboardManager = new ClipBoardManager();
 
-    public static StateManager stateManager = new StateManager();
-    public static ExporterFactory exportFactory;
     // Key binding preferences
     private static KeyBindingRepository keyBindingRepository;
-    // Background tasks
-    private static GlobalFocusListener focusListener;
+
     private static DefaultFileUpdateMonitor fileUpdateMonitor;
     private static ThemeLoader themeLoader;
     private static TelemetryClient telemetryClient;
@@ -78,13 +90,11 @@ public class Globals {
     }
 
     // Background tasks
-    public static void startBackgroundTasks() {
-        Globals.focusListener = new GlobalFocusListener();
-
+    public static void startBackgroundTasks() throws JabRefException {
         Globals.fileUpdateMonitor = new DefaultFileUpdateMonitor();
         JabRefExecutorService.INSTANCE.executeInterruptableTask(Globals.fileUpdateMonitor, "FileUpdateMonitor");
 
-        themeLoader = new ThemeLoader(fileUpdateMonitor);
+        themeLoader = new ThemeLoader(fileUpdateMonitor, prefs);
 
         if (Globals.prefs.shouldCollectTelemetry() && !GraphicsEnvironment.isHeadless()) {
             startTelemetryClient();
@@ -117,10 +127,6 @@ public class Globals {
         telemetryClient.trackSessionState(SessionState.Start);
     }
 
-    public static GlobalFocusListener getFocusListener() {
-        return focusListener;
-    }
-
     public static FileUpdateMonitor getFileUpdateMonitor() {
         return fileUpdateMonitor;
     }
@@ -132,6 +138,7 @@ public class Globals {
 
     public static void stopBackgroundTasks() {
         stopTelemetryClient();
+        Unirest.shutDown();
     }
 
     public static Optional<TelemetryClient> getTelemetryClient() {

@@ -10,7 +10,6 @@ import java.util.List;
 public enum StandardFileType implements FileType {
     BIBTEXML("bibx", "xml"),
     ENDNOTE("ref", "enw"),
-    FREECITE("txt", "xml"),
     ISI("isi", "txt"),
     MEDLINE("nbib", "xml"),
     MEDLINE_PLAIN("nbib", "txt"),
@@ -24,6 +23,7 @@ public enum StandardFileType implements FileType {
     CSV("csv"),
     HTML("html"),
     JAR("jar"),
+    JAVA_KEYSTORE("jks"),
     JSTYLE("jstyle"),
     LAYOUT("layout"),
     ODS("ods"),
@@ -34,7 +34,9 @@ public enum StandardFileType implements FileType {
     RDF("rdf"),
     RTF("rtf"),
     SXC("sxc"),
+    TEX("tex"),
     XML("xml"),
+    JSON("json"),
     XMP("xmp"),
     ZIP("zip");
 
@@ -50,6 +52,11 @@ public enum StandardFileType implements FileType {
     }
 
     public static FileType newFileType(String... extensions) {
+        for (int i = 0; i < extensions.length; i++) {
+            if (extensions[i].contains(".")) {
+                extensions[i] = extensions[i].substring(extensions[i].indexOf('.') + 1);
+            }
+        }
         return () -> Arrays.asList(extensions);
     }
 }

@@ -3,11 +3,12 @@ package org.jabref.logic.importer;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
 import org.jabref.JabRefExecutorService;
 import org.jabref.logic.net.URLDownload;
 import org.jabref.model.entry.BibEntry;
-import org.jabref.model.entry.FieldName;
+import org.jabref.model.entry.field.StandardField;
 import org.jabref.model.entry.identifier.DOI;
 
 import org.slf4j.Logger;
@@ -34,7 +35,7 @@ public class FulltextFetchers {
     // Timeout in seconds
     private static final int FETCHER_TIMEOUT = 10;
 
-    private final List<FulltextFetcher> finders = new ArrayList<>();
+    private final Set<FulltextFetcher> finders = new HashSet<>();
 
     private final Predicate<String> isPDF = url -> {
         try {
@@ -49,14 +50,14 @@ public class FulltextFetchers {
         this(WebFetchers.getFullTextFetchers(importFormatPreferences));
     }
 
-    FulltextFetchers(List<FulltextFetcher> fetcher) {
+    FulltextFetchers(Set<FulltextFetcher> fetcher) {
         finders.addAll(fetcher);
     }
 
     public Optional<URL> findFullTextPDF(BibEntry entry) {
         // for accuracy, fetch DOI first but do not modify entry
         BibEntry clonedEntry = (BibEntry) entry.clone();
-        Optional<DOI> doi = clonedEntry.getField(FieldName.DOI).flatMap(DOI::parse);
+        Optional<DOI> doi = clonedEntry.getField(StandardField.DOI).flatMap(DOI::parse);
 
         if (!doi.isPresent()) {
             findDoiForEntry(clonedEntry);
@@ -77,8 +78,8 @@ public class FulltextFetchers {
     private void findDoiForEntry(BibEntry clonedEntry) {
         try {
             WebFetchers.getIdFetcherForIdentifier(DOI.class)
-                    .findIdentifier(clonedEntry)
-                    .ifPresent(e -> clonedEntry.setField(FieldName.DOI, e.getDOI()));
+                       .findIdentifier(clonedEntry)
+                       .ifPresent(e -> clonedEntry.setField(StandardField.DOI, e.getDOI()));
         } catch (FetcherException e) {
             LOGGER.debug("Failed to find DOI", e);
         }
@@ -108,7 +109,7 @@ public class FulltextFetchers {
         };
     }
 
-    private List<Callable<Optional<FetcherResult>>> getCallables(BibEntry entry, List<FulltextFetcher> fetchers) {
+    private List<Callable<Optional<FetcherResult>>> getCallables(BibEntry entry, Set<FulltextFetcher> fetchers) {
         return fetchers.stream()
                 .map(f -> getCallable(entry, f))
                 .collect(Collectors.toList());

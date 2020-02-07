@@ -17,8 +17,13 @@ import org.jabref.logic.importer.Importer;
 import org.jabref.logic.importer.ParserResult;
 import org.jabref.logic.util.StandardFileType;
 import org.jabref.model.entry.BibEntry;
-import org.jabref.model.entry.FieldName;
 import org.jabref.model.entry.Month;
+import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.FieldFactory;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
+import org.jabref.model.entry.types.EntryType;
+import org.jabref.model.entry.types.StandardEntryType;
 
 /**
  * Importer for the ISI Web of Science, INSPEC and Medline format.
@@ -70,7 +75,7 @@ public class IsiImporter extends Importer {
         int i = 0;
         while (((str = reader.readLine()) != null) && (i < 50)) {
 
-            /**
+            /*
              * The following line gives false positives for RIS files, so it
              * should not be uncommented. The hypen is a characteristic of the
              * RIS format.
@@ -86,15 +91,15 @@ public class IsiImporter extends Importer {
         return false;
     }
 
-    public static void processSubSup(Map<String, String> map) {
+    public static void processSubSup(Map<Field, String> map) {
 
-        String[] subsup = {FieldName.TITLE, FieldName.ABSTRACT, FieldName.REVIEW, "notes"};
+        Field[] subsup = {StandardField.TITLE, StandardField.ABSTRACT, StandardField.REVIEW, new UnknownField("notes")};
 
-        for (String aSubsup : subsup) {
+        for (Field aSubsup : subsup) {
             if (map.containsKey(aSubsup)) {
 
                 Matcher m = IsiImporter.SUB_SUP_PATTERN.matcher(map.get(aSubsup));
-                StringBuffer sb = new StringBuffer();
+                StringBuilder sb = new StringBuilder();
 
                 while (m.find()) {
 
@@ -117,11 +122,11 @@ public class IsiImporter extends Importer {
         }
     }
 
-    private static void processCapitalization(Map<String, String> map) {
+    private static void processCapitalization(Map<Field, String> map) {
 
-        String[] subsup = {FieldName.TITLE, FieldName.JOURNAL, FieldName.PUBLISHER};
+        Field[] subsup = {StandardField.TITLE, StandardField.JOURNAL, StandardField.PUBLISHER};
 
-        for (String aSubsup : subsup) {
+        for (Field aSubsup : subsup) {
 
             if (map.containsKey(aSubsup)) {
 
@@ -138,7 +143,7 @@ public class IsiImporter extends Importer {
     public ParserResult importDatabase(BufferedReader reader) throws IOException {
         Objects.requireNonNull(reader);
 
-        List<BibEntry> bibitems = new ArrayList<>();
+        List<BibEntry> bibEntries = new ArrayList<>();
         StringBuilder sb = new StringBuilder();
 
         // Pattern fieldPattern = Pattern.compile("^AU |^TI |^SO |^DT |^C1 |^AB
@@ -171,7 +176,7 @@ public class IsiImporter extends Importer {
 
         String[] entries = sb.toString().split("::");
 
-        Map<String, String> hm = new HashMap<>();
+        Map<Field, String> hm = new HashMap<>();
 
         // skip the first entry as it is either empty or has document header
         for (String entry : entries) {
@@ -181,7 +186,7 @@ public class IsiImporter extends Importer {
                 fields = entry.split("\n");
             }
 
-            String Type = "";
+            EntryType type = BibEntry.DEFAULT_TYPE;
             String PT = "";
             String pages = "";
             hm.clear();
@@ -205,41 +210,39 @@ public class IsiImporter extends Importer {
                     } else {
                         PT = value;
                     }
-                    Type = "article"; // make all of them PT?
+                    type = StandardEntryType.Article; // make all of them PT?
                 } else if ("TY".equals(beg)) {
                     if ("JOUR".equals(value)) {
-                        Type = "article";
+                        type = StandardEntryType.Article;
                     } else if ("CONF".equals(value)) {
-                        Type = "inproceedings";
+                        type = StandardEntryType.InProceedings;
                     }
                 } else if ("JO".equals(beg)) {
-                    hm.put(FieldName.BOOKTITLE, value);
+                    hm.put(StandardField.BOOKTITLE, value);
                 } else if ("AU".equals(beg)) {
                     String author = IsiImporter.isiAuthorsConvert(EOL_PATTERN.matcher(value).replaceAll(" and "));
 
                     // if there is already someone there then append with "and"
-                    if (hm.get(FieldName.AUTHOR) != null) {
-                        author = hm.get(FieldName.AUTHOR) + " and " + author;
+                    if (hm.get(StandardField.AUTHOR) != null) {
+                        author = hm.get(StandardField.AUTHOR) + " and " + author;
                     }
 
-                    hm.put(FieldName.AUTHOR, author);
+                    hm.put(StandardField.AUTHOR, author);
                 } else if ("TI".equals(beg)) {
-                    hm.put(FieldName.TITLE, EOL_PATTERN.matcher(value).replaceAll(" "));
+                    hm.put(StandardField.TITLE, EOL_PATTERN.matcher(value).replaceAll(" "));
                 } else if ("SO".equals(beg) || "JA".equals(beg)) {
-                    hm.put(FieldName.JOURNAL, EOL_PATTERN.matcher(value).replaceAll(" "));
+                    hm.put(StandardField.JOURNAL, EOL_PATTERN.matcher(value).replaceAll(" "));
                 } else if ("ID".equals(beg) || "KW".equals(beg)) {
-
                     value = EOL_PATTERN.matcher(value).replaceAll(" ");
-                    String existingKeywords = hm.get(FieldName.KEYWORDS);
+                    String existingKeywords = hm.get(StandardField.KEYWORDS);
                     if ((existingKeywords == null) || existingKeywords.contains(value)) {
                         existingKeywords = value;
                     } else {
                         existingKeywords += ", " + value;
                     }
-                    hm.put(FieldName.KEYWORDS, existingKeywords);
-
+                    hm.put(StandardField.KEYWORDS, existingKeywords);
                 } else if ("AB".equals(beg)) {
-                    hm.put(FieldName.ABSTRACT, EOL_PATTERN.matcher(value).replaceAll(" "));
+                    hm.put(StandardField.ABSTRACT, EOL_PATTERN.matcher(value).replaceAll(" "));
                 } else if ("BP".equals(beg) || "BR".equals(beg) || "SP".equals(beg)) {
                     pages = value;
                 } else if ("EP".equals(beg)) {
@@ -256,44 +259,41 @@ public class IsiImporter extends Importer {
                 } else if ("AR".equals(beg)) {
                     pages = value;
                 } else if ("IS".equals(beg)) {
-                    hm.put(FieldName.NUMBER, value);
+                    hm.put(StandardField.NUMBER, value);
                 } else if ("PY".equals(beg)) {
-                    hm.put(FieldName.YEAR, value);
+                    hm.put(StandardField.YEAR, value);
                 } else if ("VL".equals(beg)) {
-                    hm.put(FieldName.VOLUME, value);
+                    hm.put(StandardField.VOLUME, value);
                 } else if ("PU".equals(beg)) {
-                    hm.put(FieldName.PUBLISHER, value);
+                    hm.put(StandardField.PUBLISHER, value);
                 } else if ("DI".equals(beg)) {
-                    hm.put(FieldName.DOI, value);
+                    hm.put(StandardField.DOI, value);
                 } else if ("PD".equals(beg)) {
-
                     String month = IsiImporter.parseMonth(value);
                     if (month != null) {
-                        hm.put(FieldName.MONTH, month);
+                        hm.put(StandardField.MONTH, month);
                     }
-
                 } else if ("DT".equals(beg)) {
-                    Type = value;
-                    if ("Review".equals(Type)) {
-                        Type = "article"; // set "Review" in Note/Comment?
-                    } else if (Type.startsWith("Article") || Type.startsWith("Journal") || "article".equals(PT)) {
-                        Type = "article";
+                    if ("Review".equals(value)) {
+                        type = StandardEntryType.Article; // set "Review" in Note/Comment?
+                    } else if (value.startsWith("Article") || value.startsWith("Journal") || "article".equals(PT)) {
+                        type = StandardEntryType.Article;
                     } else {
-                        Type = BibEntry.DEFAULT_TYPE;
+                        type = BibEntry.DEFAULT_TYPE;
                     }
                 } else if ("CR".equals(beg)) {
-                    hm.put("CitedReferences", EOL_PATTERN.matcher(value).replaceAll(" ; ").trim());
+                    hm.put(new UnknownField("CitedReferences"), EOL_PATTERN.matcher(value).replaceAll(" ; ").trim());
                 } else {
                     // Preserve all other entries except
                     if ("ER".equals(beg) || "EF".equals(beg) || "VR".equals(beg) || "FN".equals(beg)) {
                         continue;
                     }
-                    hm.put(beg.toLowerCase(Locale.ROOT), value);
+                    hm.put(FieldFactory.parseField(beg), value);
                 }
             }
 
             if (!"".equals(pages)) {
-                hm.put(FieldName.PAGES, pages);
+                hm.put(StandardField.PAGES, pages);
             }
 
             // Skip empty entries
@@ -301,12 +301,12 @@ public class IsiImporter extends Importer {
                 continue;
             }
 
-            BibEntry b = new BibEntry(Type);
+            BibEntry b = new BibEntry(type);
             // id assumes an existing database so don't
 
             // Remove empty fields:
             List<Object> toRemove = new ArrayList<>();
-            for (Map.Entry<String, String> field : hm.entrySet()) {
+            for (Map.Entry<Field, String> field : hm.entrySet()) {
                 String content = field.getValue();
                 if ((content == null) || content.trim().isEmpty()) {
                     toRemove.add(field.getKey());
@@ -323,17 +323,19 @@ public class IsiImporter extends Importer {
 
             b.setField(hm);
 
-            bibitems.add(b);
+            bibEntries.add(b);
         }
-        return new ParserResult(bibitems);
+        return new ParserResult(bibEntries);
     }
 
     private static String parsePages(String value) {
         return value.replace("-", "--");
     }
 
-    public static String parseMonth(String value) {
-
+    /**
+     * Parses the month and returns it in the JabRef format
+     */
+    static String parseMonth(String value) {
         String[] parts = value.split("\\s|\\-");
         for (String part1 : parts) {
             Optional<Month> month = Month.getMonthByShortName(part1.toLowerCase(Locale.ROOT));

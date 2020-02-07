@@ -1,56 +1,11 @@
 package org.jabref.gui.customentrytypes;
 
-import java.awt.BorderLayout;
-import java.awt.Container;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.GridLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
+import org.jabref.gui.util.BaseDialog;
 
-import javax.swing.AbstractAction;
-import javax.swing.ActionMap;
-import javax.swing.BorderFactory;
-import javax.swing.InputMap;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.ListSelectionModel;
-import javax.swing.event.ListDataEvent;
-import javax.swing.event.ListDataListener;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
+public class EntryTypeCustomizationDialog extends BaseDialog<Void> {
 
-import org.jabref.Globals;
-import org.jabref.gui.BasePanel;
-import org.jabref.gui.JabRefDialog;
-import org.jabref.gui.JabRefFrame;
-import org.jabref.gui.keyboard.KeyBinding;
-import org.jabref.logic.l10n.Localization;
-import org.jabref.model.EntryTypes;
-import org.jabref.model.database.BibDatabaseMode;
-import org.jabref.model.entry.BibEntry;
-import org.jabref.model.entry.CustomEntryType;
-import org.jabref.model.entry.EntryType;
-import org.jabref.model.entry.InternalBibtexFields;
-import org.jabref.model.strings.StringUtil;
-
-import com.jgoodies.forms.builder.ButtonBarBuilder;
-
-public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSelectionListener {
-
+    // TODO: Re-implement customize entry types feature (https://github.com/JabRef/jabref/issues/4719)
+    /*
     protected GridBagLayout gbl = new GridBagLayout();
     protected GridBagConstraints con = new GridBagConstraints();
     protected JButton delete;
@@ -70,9 +25,6 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
     private boolean biblatexMode;
     private BibDatabaseMode bibDatabaseMode;
 
-    /**
-     * Creates a new instance of EntryTypeCustomizationDialog
-     */
     public EntryTypeCustomizationDialog(JabRefFrame frame) {
         super(Localization.lang("Customize entry types"), false, EntryTypeCustomizationDialog.class);
 
@@ -98,7 +50,7 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
         right.setLayout(new GridLayout(biblatexMode ? 2 : 1, 2));
 
         List<String> entryTypes = new ArrayList<>();
-        entryTypes.addAll(EntryTypes.getAllTypes(bibDatabaseMode));
+        entryTypes.addAll(EntryTypeFactory.getAllTypes(bibDatabaseMode));
 
         typeComp = new EntryTypeList(frame.getDialogService(), entryTypes, bibDatabaseMode);
         typeComp.addListSelectionListener(this);
@@ -193,7 +145,7 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
         }
         Set<String> requiredFieldsSelectedType = reqLists.get(selectedTypeName);
         if (requiredFieldsSelectedType == null) {
-            Optional<EntryType> type = EntryTypes.getType(selectedTypeName, bibDatabaseMode);
+            Optional<EntryType> type = EntryTypeFactory.getType(selectedTypeName, bibDatabaseMode);
             if (type.isPresent()) {
                 Set<String> req = type.get().getRequiredFields();
 
@@ -262,14 +214,14 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
 
             if (defaulted.contains(stringListEntry.getKey())) {
                 // This type should be reverted to its default setup.
-                EntryTypes.removeType(stringListEntry.getKey(), bibDatabaseMode);
+                EntryTypeFactory.removeType(stringListEntry.getKey(), bibDatabaseMode);
 
                 actuallyChangedTypes.add(stringListEntry.getKey().toLowerCase(Locale.ENGLISH));
                 defaulted.remove(stringListEntry.getKey());
                 continue;
             }
 
-            Optional<EntryType> oldType = EntryTypes.getType(stringListEntry.getKey(), bibDatabaseMode);
+            Optional<EntryType> oldType = EntryTypeFactory.getType(stringListEntry.getKey(), bibDatabaseMode);
             if (oldType.isPresent()) {
                 Set<String> oldRequiredFieldsList = oldType.get().getRequiredFieldsFlat();
                 Set<String> oldOptionalFieldsList = oldType.get().getOptionalFields();
@@ -288,11 +240,11 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
             }
 
             if (changesMade) {
-                CustomEntryType customType = biblatexMode ?
-                        new CustomEntryType(StringUtil.capitalizeFirst(stringListEntry.getKey()), requiredFieldsList, optionalFieldsList, secondaryOptionalFieldsLists) :
-                        new CustomEntryType(StringUtil.capitalizeFirst(stringListEntry.getKey()), requiredFieldsList, optionalFieldsList);
+                BibEntryType customType = biblatexMode ?
+                        new BibEntryType(StringUtil.capitalizeFirst(stringListEntry.getKey()), requiredFieldsList, optionalFieldsList, secondaryOptionalFieldsLists) :
+                        new BibEntryType(StringUtil.capitalizeFirst(stringListEntry.getKey()), requiredFieldsList, optionalFieldsList);
 
-                EntryTypes.addOrModifyCustomEntryType(customType, bibDatabaseMode);
+                EntryTypeFactory.addOrModifyBibEntryType(customType, bibDatabaseMode);
                 actuallyChangedTypes.add(customType.getName().toLowerCase(Locale.ENGLISH));
             }
         }
@@ -303,7 +255,7 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
         }
 
         Set<String> typesToRemove = new HashSet<>();
-        for (String existingType : EntryTypes.getAllTypes(bibDatabaseMode)) {
+        for (String existingType : EntryTypeFactory.getAllTypes(bibDatabaseMode)) {
             if (!types.contains(existingType)) {
                 typesToRemove.add(existingType);
             }
@@ -316,14 +268,14 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
             }
         }
 
-        CustomEntryTypesManager.saveCustomEntryTypes(Globals.prefs);
+        BibEntryTypesManager.saveBibEntryTypes(Globals.prefs);
     }
 
     private void deleteType(String name) {
-        Optional<EntryType> type = EntryTypes.getType(name, bibDatabaseMode);
+        Optional<EntryType> type = EntryTypeFactory.getType(name, bibDatabaseMode);
 
-        if (type.isPresent() && (type.get() instanceof CustomEntryType)) {
-            if (!EntryTypes.getStandardType(name, bibDatabaseMode).isPresent()) {
+        if (type.isPresent() && (type.get() instanceof BibEntryType)) {
+            if (!EntryTypeFactory.getStandardType(name, bibDatabaseMode).isPresent()) {
 
                 boolean deleteCustomClicked = frame.getDialogService().showConfirmationDialogAndWait(Localization.lang("Delete custom format") +
                         " '" + StringUtil.capitalizeFirst(name) + '\'',  Localization.lang("All entries of this "
@@ -335,7 +287,7 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
                     return;
                 }
             }
-            EntryTypes.removeType(name, bibDatabaseMode);
+            EntryTypeFactory.removeType(name, bibDatabaseMode);
             updateEntriesForChangedTypes(Collections.singletonList(name.toLowerCase(Locale.ENGLISH)));
             changed.remove(name);
             reqLists.remove(name);
@@ -353,7 +305,7 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
                     .filter(entry -> actuallyChangedTypes.contains(entry.getType().toLowerCase(Locale.ENGLISH))).collect(Collectors.toList());
 
             // update all affected entries with new type
-            filtered.forEach(entry -> EntryTypes.getType(entry.getType(), bibDatabaseMode).ifPresent(entry::setType));
+            filtered.forEach(entry -> EntryTypeFactory.getType(entry.getType(), bibDatabaseMode).ifPresent(entry::setType));
         }
     }
 
@@ -368,7 +320,7 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
             }
             defaulted.add(lastSelected);
 
-            Optional<EntryType> type = EntryTypes.getStandardType(lastSelected, bibDatabaseMode);
+            Optional<EntryType> type = EntryTypeFactory.getStandardType(lastSelected, bibDatabaseMode);
             if (type.isPresent()) {
                 Set<String> of = type.get().getOptionalFields();
                 Set<String> req = type.get().getRequiredFields();
@@ -419,6 +371,7 @@ public class EntryTypeCustomizationDialog extends JabRefDialog implements ListSe
             changed.add(lastSelected);
             typeComp.enable(lastSelected, true);
         }
-
     }
+
+    */
 }

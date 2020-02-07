@@ -5,6 +5,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -17,7 +18,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 
 import org.jabref.model.database.BibDatabaseContext;
-import org.jabref.model.metadata.FileDirectoryPreferences;
+import org.jabref.model.metadata.FilePreferences;
 import org.jabref.model.util.FileHelper;
 
 /**
@@ -32,6 +33,14 @@ public class LinkedFile implements Serializable {
     private transient StringProperty link = new SimpleStringProperty();
     private transient StringProperty fileType = new SimpleStringProperty();
 
+    public LinkedFile(String description, Path link, String fileType) {
+        this(description, link.toString(), fileType);
+    }
+
+    /**
+     * @deprecated use the other constructor {@link #LinkedFile(String, Path, String)}
+     */
+    @Deprecated
     public LinkedFile(String description, String link, String fileType) {
         this.description.setValue(Objects.requireNonNull(description));
         this.fileType.setValue(Objects.requireNonNull(fileType));
@@ -126,10 +135,11 @@ public class LinkedFile implements Serializable {
     /**
      * Checks if the given String is an online link
      * @param toCheck The String to check
-     * @return True if it starts with http://, https:// or contains www; false otherwise
+     * @return <code>true</code>, if it starts with "http://", "https://" or contains "www."; <code>false</code> otherwise
      */
     private boolean isOnlineLink(String toCheck) {
-        return toCheck.startsWith("http://") || toCheck.startsWith("https://") || toCheck.contains("www.");
+        String normalizedFilePath = toCheck.trim().toLowerCase();
+        return normalizedFilePath.startsWith("http://") || normalizedFilePath.startsWith("https://") || normalizedFilePath.contains("www.");
     }
 
     @Override
@@ -154,16 +164,29 @@ public class LinkedFile implements Serializable {
         return isOnlineLink(link.get());
     }
 
-    public Optional<Path> findIn(BibDatabaseContext databaseContext, FileDirectoryPreferences fileDirectoryPreferences) {
-        List<Path> dirs = databaseContext.getFileDirectoriesAsPaths(fileDirectoryPreferences);
+    public Optional<Path> findIn(BibDatabaseContext databaseContext, FilePreferences filePreferences) {
+        List<Path> dirs = databaseContext.getFileDirectoriesAsPaths(filePreferences);
         return findIn(dirs);
     }
 
+    /**
+     * Tries to find the file in the given directories and returns the path to the file (if found). Returns an empty
+     * optional if the file cannot be found.
+     */
     public Optional<Path> findIn(List<Path> directories) {
         try {
+            if (link.get().isEmpty()) {
+                // We do not want to match empty paths (which could be any file or none ?!)
+                return Optional.empty();
+            }
+
             Path file = Paths.get(link.get());
             if (file.isAbsolute() || directories.isEmpty()) {
-                return Optional.of(file);
+                if (Files.exists(file)) {
+                    return Optional.of(file);
+                } else {
+                    return Optional.empty();
+                }
             } else {
                 return FileHelper.expandFilenameAsPath(link.get(), directories);
             }
@@ -171,5 +194,4 @@ public class LinkedFile implements Serializable {
             return Optional.empty();
         }
     }
-
 }

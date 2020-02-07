@@ -3,12 +3,12 @@ package org.jabref.gui.actions;
 /**
  * Global String constants for GUI actions
  */
+@Deprecated
 public enum Actions {
-
-    ABBREVIATE_ISO,
+    ABBREVIATE_DEFAULT,
     ABBREVIATE_MEDLINE,
+    ABBREVIATE_SHORTEST_UNIQUE,
     ADD_FILE_LINK,
-    ADD_TO_GROUP,
     CLEANUP,
     COPY,
     COPY_CITATION_ASCII_DOC,
@@ -34,7 +34,6 @@ public enum Actions {
     MERGE_ENTRIES,
     MERGE_WITH_FETCHED_ENTRY,
     NEXT_PREVIEW_STYLE,
-    MOVE_TO_GROUP,
     OPEN_CONSOLE,
     OPEN_EXTERNAL_FILE,
     OPEN_FOLDER,
@@ -43,16 +42,13 @@ public enum Actions {
     PREVIOUS_PREVIEW_STYLE,
     PULL_CHANGES_FROM_SHARED_DATABASE,
     REDO,
-    REMOVE_FROM_GROUP,
     REPLACE_ALL,
-    RESOLVE_DUPLICATE_KEYS,
     SAVE,
     SAVE_AS,
     SAVE_SELECTED_AS_PLAIN,
     SELECT_ALL,
     SEND_AS_EMAIL,
     TOGGLE_GROUPS,
-    TOGGLE_PREVIEW,
     UNABBREVIATE,
     UNDO,
     WRITE_XMP,

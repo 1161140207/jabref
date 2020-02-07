@@ -29,7 +29,7 @@ public class KeyBindingsDialogView extends BaseDialog<Void> {
     @FXML private TreeTableView<KeyBindingViewModel> keyBindingsTable;
     @FXML private TreeTableColumn<KeyBindingViewModel, String> actionColumn;
     @FXML private TreeTableColumn<KeyBindingViewModel, String> shortcutColumn;
-    @FXML private TreeTableColumn<KeyBindingViewModel, String> resetColumn;
+    @FXML private TreeTableColumn<KeyBindingViewModel, KeyBindingViewModel> resetColumn;
 
     @Inject private KeyBindingRepository keyBindingRepository;
     @Inject private DialogService dialogService;
@@ -39,7 +39,6 @@ public class KeyBindingsDialogView extends BaseDialog<Void> {
     public KeyBindingsDialogView() {
         this.setTitle(Localization.lang("Key bindings"));
         this.getDialogPane().setPrefSize(375, 475);
-        this.setResizable(true);
 
         ViewLoader.view(this)
                   .load()
@@ -66,10 +65,10 @@ public class KeyBindingsDialogView extends BaseDialog<Void> {
         );
         actionColumn.setCellValueFactory(cellData -> cellData.getValue().getValue().nameProperty());
         shortcutColumn.setCellValueFactory(cellData -> cellData.getValue().getValue().shownBindingProperty());
-        resetColumn.setCellFactory(new ViewModelTreeTableCellFactory<KeyBindingViewModel, String>()
+        new ViewModelTreeTableCellFactory<KeyBindingViewModel>()
                 .withGraphic(keyBinding -> keyBinding.getIcon().map(JabRefIcon::getGraphicNode).orElse(null))
                 .withOnMouseClickedEvent(keyBinding -> evt -> keyBinding.resetToDefault())
-        );
+                .install(resetColumn);
     }
 
     @FXML

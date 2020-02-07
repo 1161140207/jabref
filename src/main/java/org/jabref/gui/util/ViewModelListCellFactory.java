@@ -1,7 +1,13 @@
 package org.jabref.gui.util;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
+import javafx.beans.value.ObservableValue;
+import javafx.css.PseudoClass;
 import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContextMenu;
@@ -10,14 +16,13 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.DragEvent;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.paint.Paint;
-import javafx.scene.text.Text;
+import javafx.scene.paint.Color;
 import javafx.util.Callback;
 
+import org.jabref.gui.icon.JabRefIcon;
 import org.jabref.model.strings.StringUtil;
 
-import de.jensd.fx.glyphs.GlyphIcons;
-import de.jensd.fx.glyphs.materialdesignicons.utils.MaterialDesignIconFactory;
+import org.fxmisc.easybind.Subscription;
 
 /**
  * Constructs a {@link ListCell} based on the view model of the row and a bunch of specified converter methods.
@@ -28,7 +33,7 @@ public class ViewModelListCellFactory<T> implements Callback<ListView<T>, ListCe
 
     private Callback<T, String> toText;
     private Callback<T, Node> toGraphic;
-    private Callback<T, String> toTooltip;
+    private Callback<T, Tooltip> toTooltip;
     private BiConsumer<T, ? super MouseEvent> toOnMouseClickedEvent;
     private Callback<T, String> toStyleClass;
     private Callback<T, ContextMenu> toContextMenu;
@@ -37,6 +42,7 @@ public class ViewModelListCellFactory<T> implements Callback<ListView<T>, ListCe
     private BiConsumer<T, ? super DragEvent> toOnDragEntered;
     private BiConsumer<T, ? super DragEvent> toOnDragExited;
     private BiConsumer<T, ? super DragEvent> toOnDragOver;
+    private Map<PseudoClass, Callback<T, ObservableValue<Boolean>>> pseudoClasses = new HashMap<>();
 
     public ViewModelListCellFactory<T> withText(Callback<T, String> toText) {
         this.toText = toText;
@@ -48,21 +54,37 @@ public class ViewModelListCellFactory<T> implements Callback<ListView<T>, ListCe
         return this;
     }
 
-    public ViewModelListCellFactory<T> withIcon(Callback<T, GlyphIcons> toIcon) {
-        this.toGraphic = viewModel -> MaterialDesignIconFactory.get().createIcon(toIcon.call(viewModel));
-        return this;
-    }
-
-    public ViewModelListCellFactory<T> withIcon(Callback<T, GlyphIcons> toIcon, Callback<T, Paint> toColor) {
+    public ViewModelListCellFactory<T> withIcon(Callback<T, JabRefIcon> toIcon) {
         this.toGraphic = viewModel -> {
-            Text graphic = MaterialDesignIconFactory.get().createIcon(toIcon.call(viewModel));
-            graphic.setFill(toColor.call(viewModel));
-            return graphic;
+            JabRefIcon icon = toIcon.call(viewModel);
+            if (icon != null) {
+                return icon.getGraphicNode();
+            }
+            return null;
         };
         return this;
     }
 
-    public ViewModelListCellFactory<T> withTooltip(Callback<T, String> toTooltip) {
+    public ViewModelListCellFactory<T> withIcon(Callback<T, JabRefIcon> toIcon, Callback<T, Color> toColor) {
+        this.toGraphic = viewModel -> {
+
+            return toIcon.call(viewModel).withColor(toColor.call(viewModel)).getGraphicNode();
+        };
+        return this;
+    }
+
+    public ViewModelListCellFactory<T> withStringTooltip(Callback<T, String> toStringTooltip) {
+        this.toTooltip = viewModel -> {
+            String tooltipText = toStringTooltip.call(viewModel);
+            if (StringUtil.isNotBlank(tooltipText)) {
+                return new Tooltip(tooltipText);
+            }
+            return null;
+        };
+        return this;
+    }
+
+    public ViewModelListCellFactory<T> withTooltip(Callback<T, Tooltip> toTooltip) {
         this.toTooltip = toTooltip;
         return this;
     }
@@ -77,8 +99,7 @@ public class ViewModelListCellFactory<T> implements Callback<ListView<T>, ListCe
         return this;
     }
 
-    public ViewModelListCellFactory<T> withOnMouseClickedEvent(
-            BiConsumer<T, ? super MouseEvent> toOnMouseClickedEvent) {
+    public ViewModelListCellFactory<T> withOnMouseClickedEvent(BiConsumer<T, ? super MouseEvent> toOnMouseClickedEvent) {
         this.toOnMouseClickedEvent = toOnMouseClickedEvent;
         return this;
     }
@@ -108,9 +129,18 @@ public class ViewModelListCellFactory<T> implements Callback<ListView<T>, ListCe
         return this;
     }
 
+    public ViewModelListCellFactory<T> withPseudoClass(PseudoClass pseudoClass, Callback<T, ObservableValue<Boolean>> toCondition) {
+        this.pseudoClasses.putIfAbsent(pseudoClass, toCondition);
+        return this;
+    }
+
     public void install(ComboBox<T> comboBox) {
         comboBox.setButtonCell(this.call(null));
         comboBox.setCellFactory(this);
+    }
+
+    public void install(ListView<T> listView) {
+        listView.setCellFactory(this);
     }
 
     @Override
@@ -118,9 +148,15 @@ public class ViewModelListCellFactory<T> implements Callback<ListView<T>, ListCe
 
         return new ListCell<T>() {
 
+            List<Subscription> subscriptions = new ArrayList<>();
+
             @Override
             protected void updateItem(T item, boolean empty) {
                 super.updateItem(item, empty);
+
+                // Remove previous subscriptions
+                subscriptions.forEach(Subscription::unsubscribe);
+                subscriptions.clear();
 
                 T viewModel = getItem();
                 if (empty || (viewModel == null)) {
@@ -142,10 +178,7 @@ public class ViewModelListCellFactory<T> implements Callback<ListView<T>, ListCe
                         getStyleClass().setAll(toStyleClass.call(viewModel));
                     }
                     if (toTooltip != null) {
-                        String tooltipText = toTooltip.call(viewModel);
-                        if (StringUtil.isNotBlank(tooltipText)) {
-                            setTooltip(new Tooltip(tooltipText));
-                        }
+                        setTooltip(toTooltip.call(viewModel));
                     }
                     if (toContextMenu != null) {
                         setContextMenu(toContextMenu.call(viewModel));
@@ -165,8 +198,12 @@ public class ViewModelListCellFactory<T> implements Callback<ListView<T>, ListCe
                     if (toOnDragOver != null) {
                         setOnDragOver(event -> toOnDragOver.accept(viewModel, event));
                     }
+                    for (Map.Entry<PseudoClass, Callback<T, ObservableValue<Boolean>>> pseudoClassWithCondition : pseudoClasses.entrySet()) {
+                        ObservableValue<Boolean> condition = pseudoClassWithCondition.getValue().call(viewModel);
+                        Subscription subscription = BindingsHelper.includePseudoClassWhen(this, pseudoClassWithCondition.getKey(), condition);
+                        subscriptions.add(subscription);
+                    }
                 }
-                getListView().refresh();
             }
         };
     }

@@ -2,14 +2,16 @@ package org.jabref.model.cleanup;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
+import java.util.TreeMap;
 
 import org.jabref.model.FieldChange;
 import org.jabref.model.entry.BibEntry;
+import org.jabref.model.entry.field.Field;
 
 public class FieldFormatterCleanups {
 
@@ -60,7 +62,7 @@ public class FieldFormatterCleanups {
         if (enabled) {
             return applyAllActions(entry);
         } else {
-            return new ArrayList<>();
+            return Collections.emptyList();
         }
     }
 
@@ -90,9 +92,9 @@ public class FieldFormatterCleanups {
 
     private static String getMetaDataString(List<FieldFormatterCleanup> actionList, String newline) {
         //first, group all formatters by the field for which they apply
-        Map<String, List<String>> groupedByField = new HashMap<>();
+        Map<Field, List<String>> groupedByField = new TreeMap<>(Comparator.comparing(Field::getName));
         for (FieldFormatterCleanup cleanup : actionList) {
-            String key = cleanup.getField();
+            Field key = cleanup.getField();
 
             // add new list into the hashmap if needed
             if (!groupedByField.containsKey(key)) {
@@ -108,8 +110,8 @@ public class FieldFormatterCleanups {
 
         // convert the contents of the hashmap into the correct serialization
         StringBuilder result = new StringBuilder();
-        for (Map.Entry<String, List<String>> entry : groupedByField.entrySet()) {
-            result.append(entry.getKey());
+        for (Map.Entry<Field, List<String>> entry : groupedByField.entrySet()) {
+            result.append(entry.getKey().getName());
 
             StringJoiner joiner = new StringJoiner(",", "[", "]" + newline);
             entry.getValue().forEach(joiner::add);

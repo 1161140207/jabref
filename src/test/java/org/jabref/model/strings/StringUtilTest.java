@@ -21,7 +21,7 @@ class StringUtilTest {
         Path path = Paths.get("src", "main", "java", StringUtil.class.getName().replace('.', '/') + ".java");
         int lineCount = Files.readAllLines(path, StandardCharsets.UTF_8).size();
 
-        assertTrue(lineCount <= 725, "StringUtil increased in size to " + lineCount + ". "
+        assertTrue(lineCount <= 749, "StringUtil increased in size to " + lineCount + ". "
                 + "We try to keep this class as small as possible. "
                 + "Thus think twice if you add something to StringUtil.");
     }
@@ -56,7 +56,6 @@ class StringUtilTest {
     void testQuoteMoreComplicated() {
         assertEquals("a::b:%c:;", StringUtil.quote("a:b%c;", "%;", ':'));
     }
-
 
     @Test
     void testUnifyLineBreaks() {
@@ -120,7 +119,7 @@ class StringUtilTest {
 
     @Test
     void testJoin() {
-        String[] s = "ab/cd/ed".split("/");
+        String[] s = {"ab", "cd", "ed"};
         assertEquals("ab\\cd\\ed", StringUtil.join(s, "\\", 0, s.length));
 
         assertEquals("cd\\ed", StringUtil.join(s, "\\", 1, s.length));
@@ -129,7 +128,7 @@ class StringUtilTest {
 
         assertEquals("", StringUtil.join(s, "\\", 3, s.length));
 
-        assertEquals("", StringUtil.join(new String[] {}, "\\", 0, 0));
+        assertEquals("", StringUtil.join(new String[]{}, "\\", 0, 0));
     }
 
     @Test
@@ -192,7 +191,6 @@ class StringUtilTest {
         assertFalse(StringUtil.isInCurlyBrackets("}"));
         assertFalse(StringUtil.isInCurlyBrackets("a{}a"));
         assertFalse(StringUtil.isInCurlyBrackets("{\\AA}sa {\\AA}Stor{\\aa}"));
-
     }
 
     @Test

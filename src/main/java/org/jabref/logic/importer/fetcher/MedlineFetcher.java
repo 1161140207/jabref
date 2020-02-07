@@ -21,6 +21,7 @@ import javax.xml.stream.XMLStreamReader;
 
 import org.jabref.logic.formatter.bibtexfields.ClearFormatter;
 import org.jabref.logic.formatter.bibtexfields.NormalizeMonthFormatter;
+import org.jabref.logic.formatter.bibtexfields.NormalizeNamesFormatter;
 import org.jabref.logic.help.HelpFile;
 import org.jabref.logic.importer.FetcherException;
 import org.jabref.logic.importer.IdBasedParserFetcher;
@@ -31,7 +32,8 @@ import org.jabref.logic.importer.fileformat.MedlineImporter;
 import org.jabref.logic.l10n.Localization;
 import org.jabref.model.cleanup.FieldFormatterCleanup;
 import org.jabref.model.entry.BibEntry;
-import org.jabref.model.entry.FieldName;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.field.UnknownField;
 
 import org.apache.http.client.utils.URIBuilder;
 import org.slf4j.Logger;
@@ -40,7 +42,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Fetch or search from PubMed <a href="http://www.ncbi.nlm.nih.gov/sites/entrez/">www.ncbi.nlm.nih.gov</a>
  * The MedlineFetcher fetches the entries from the PubMed database.
- * See <a href="http://help.jabref.org/en/MedlineRIS">help.jabref.org</a> for a detailed documentation of the available fields.
+ * See <a href="https://docs.jabref.org/import-export/medlineris">docs.jabref.org</a> for a detailed documentation of the available fields.
  */
 public class MedlineFetcher implements IdBasedParserFetcher, SearchBasedFetcher {
     private static final Logger LOGGER = LoggerFactory.getLogger(MedlineFetcher.class);
@@ -50,7 +52,6 @@ public class MedlineFetcher implements IdBasedParserFetcher, SearchBasedFetcher 
     private static final String SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
 
     private int numberOfResultsFound;
-
 
     /**
      * Replaces all commas in a given string with " AND "
@@ -148,11 +149,12 @@ public class MedlineFetcher implements IdBasedParserFetcher, SearchBasedFetcher 
 
     @Override
     public void doPostCleanup(BibEntry entry) {
-        new FieldFormatterCleanup("journal-abbreviation", new ClearFormatter()).cleanup(entry);
-        new FieldFormatterCleanup("status", new ClearFormatter()).cleanup(entry);
-        new FieldFormatterCleanup("copyright", new ClearFormatter()).cleanup(entry);
+        new FieldFormatterCleanup(new UnknownField("journal-abbreviation"), new ClearFormatter()).cleanup(entry);
+        new FieldFormatterCleanup(new UnknownField("status"), new ClearFormatter()).cleanup(entry);
+        new FieldFormatterCleanup(new UnknownField("copyright"), new ClearFormatter()).cleanup(entry);
 
-        new FieldFormatterCleanup(FieldName.MONTH, new NormalizeMonthFormatter()).cleanup(entry);
+        new FieldFormatterCleanup(StandardField.MONTH, new NormalizeMonthFormatter()).cleanup(entry);
+        new FieldFormatterCleanup(StandardField.AUTHOR, new NormalizeNamesFormatter()).cleanup(entry);
     }
 
     @Override

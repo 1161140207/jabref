@@ -1,9 +1,7 @@
 package org.jabref.gui.importer.fetcher;
 
-import java.util.Comparator;
 import java.util.List;
-
-import javax.swing.SwingUtilities;
+import java.util.SortedSet;
 
 import javafx.beans.property.ListProperty;
 import javafx.beans.property.ObjectProperty;
@@ -14,13 +12,12 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
-import org.jabref.JabRefExecutorService;
+import org.jabref.gui.DialogService;
 import org.jabref.gui.JabRefFrame;
-import org.jabref.gui.importer.ImportInspectionDialog;
-import org.jabref.logic.importer.FetcherException;
+import org.jabref.gui.importer.ImportEntriesDialog;
+import org.jabref.gui.util.BackgroundTask;
 import org.jabref.logic.importer.ImportFormatPreferences;
 import org.jabref.logic.importer.SearchBasedFetcher;
-import org.jabref.logic.importer.WebFetcher;
 import org.jabref.logic.importer.WebFetchers;
 import org.jabref.logic.l10n.Localization;
 import org.jabref.model.entry.BibEntry;
@@ -28,24 +25,21 @@ import org.jabref.model.strings.StringUtil;
 import org.jabref.preferences.JabRefPreferences;
 
 import org.fxmisc.easybind.EasyBind;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class WebSearchPaneViewModel {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(WebSearchPaneViewModel.class);
 
     private final ObjectProperty<SearchBasedFetcher> selectedFetcher = new SimpleObjectProperty<>();
     private final ListProperty<SearchBasedFetcher> fetchers = new SimpleListProperty<>(FXCollections.observableArrayList());
     private final StringProperty query = new SimpleStringProperty();
     private final JabRefFrame frame;
+    private final DialogService dialogService;
 
-    public WebSearchPaneViewModel(ImportFormatPreferences importPreferences, JabRefFrame frame, JabRefPreferences preferences) {
+    public WebSearchPaneViewModel(ImportFormatPreferences importPreferences, JabRefFrame frame, JabRefPreferences preferences, DialogService dialogService) {
         // TODO: Rework so that we don't rely on JabRefFrame and not the complete preferences
         this.frame = frame;
+        this.dialogService = dialogService;
 
-        List<SearchBasedFetcher> allFetchers = WebFetchers.getSearchBasedFetchers(importPreferences);
-        allFetchers.sort(Comparator.comparing(WebFetcher::getName));
+        SortedSet<SearchBasedFetcher> allFetchers = WebFetchers.getSearchBasedFetchers(importPreferences);
         fetchers.setAll(allFetchers);
 
         // Choose last-selected fetcher as default
@@ -87,31 +81,24 @@ public class WebSearchPaneViewModel {
 
     public void search() {
         if (StringUtil.isBlank(getQuery())) {
-            frame.output(Localization.lang("Please enter a search string"));
+            dialogService.notify(Localization.lang("Please enter a search string"));
             return;
         }
 
         if (frame.getCurrentBasePanel() == null) {
-            frame.output(Localization.lang("Please open or start a new library before searching"));
+            dialogService.notify(Localization.lang("Please open or start a new library before searching"));
             return;
         }
 
         SearchBasedFetcher activeFetcher = getSelectedFetcher();
-        final ImportInspectionDialog dialog = new ImportInspectionDialog(frame, frame.getCurrentBasePanel(),
-                activeFetcher.getName(), false);
 
-        SwingUtilities.invokeLater(() -> dialog.setVisible(true));
+        BackgroundTask<List<BibEntry>> task = BackgroundTask.wrap(() -> activeFetcher.performSearch(getQuery().trim()))
+                                                            .withInitialMessage(Localization.lang("Processing %0", getQuery()));
 
-        JabRefExecutorService.INSTANCE.execute(() -> {
-            dialog.setStatus(Localization.lang("Processing %0", getQuery()));
-            try {
-                List<BibEntry> matches = activeFetcher.performSearch(getQuery().trim());
-                dialog.addEntries(matches);
-                dialog.entryListComplete();
-            } catch (FetcherException e) {
-                LOGGER.error("Error while fetching from " + activeFetcher.getName(), e);
-                dialog.showErrorMessage(activeFetcher.getName(), e.getLocalizedMessage());
-            }
-        });
+        task.onFailure(dialogService::showErrorDialogAndWait);
+
+        ImportEntriesDialog dialog = new ImportEntriesDialog(frame.getCurrentBasePanel().getBibDatabaseContext(), task);
+        dialog.setTitle(activeFetcher.getName());
+        dialog.showAndWait();
     }
 }

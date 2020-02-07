@@ -8,22 +8,19 @@ import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.jabref.logic.bibtex.InvalidFieldValueException;
+import org.jabref.logic.exporter.AtomicFileWriter;
 import org.jabref.logic.exporter.BibtexDatabaseWriter;
-import org.jabref.logic.exporter.FileSaveSession;
-import org.jabref.logic.exporter.SaveException;
 import org.jabref.logic.exporter.SavePreferences;
+import org.jabref.logic.util.DelayTaskThrottler;
 import org.jabref.logic.util.io.FileUtil;
 import org.jabref.model.database.BibDatabaseContext;
 import org.jabref.model.database.event.BibDatabaseContextChangedEvent;
 import org.jabref.model.database.event.CoarseChangeFilter;
+import org.jabref.model.entry.BibEntryTypesManager;
 import org.jabref.preferences.JabRefPreferences;
 
 import com.google.common.eventbus.Subscribe;
@@ -46,15 +43,15 @@ public class BackupManager {
 
     private final BibDatabaseContext bibDatabaseContext;
     private final JabRefPreferences preferences;
-    private final ExecutorService executor;
-    private final Runnable backupTask = () -> determineBackupPath().ifPresent(this::performBackup);
+    private final DelayTaskThrottler throttler;
     private final CoarseChangeFilter changeFilter;
+    private final BibEntryTypesManager entryTypesManager;
 
-    private BackupManager(BibDatabaseContext bibDatabaseContext) {
+    private BackupManager(BibDatabaseContext bibDatabaseContext, BibEntryTypesManager entryTypesManager, JabRefPreferences preferences) {
         this.bibDatabaseContext = bibDatabaseContext;
-        this.preferences = JabRefPreferences.getInstance();
-        BlockingQueue<Runnable> workerQueue = new ArrayBlockingQueue<>(1);
-        this.executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, workerQueue);
+        this.entryTypesManager = entryTypesManager;
+        this.preferences = preferences;
+        this.throttler = new DelayTaskThrottler(15000);
 
         changeFilter = new CoarseChangeFilter(bibDatabaseContext);
         changeFilter.registerListener(this);
@@ -70,8 +67,8 @@ public class BackupManager {
      *
      * @param bibDatabaseContext Associated {@link BibDatabaseContext}
      */
-    public static BackupManager start(BibDatabaseContext bibDatabaseContext) {
-        BackupManager backupManager = new BackupManager(bibDatabaseContext);
+    public static BackupManager start(BibDatabaseContext bibDatabaseContext, BibEntryTypesManager entryTypesManager, JabRefPreferences preferences) {
+        BackupManager backupManager = new BackupManager(bibDatabaseContext, entryTypesManager, preferences);
         backupManager.startBackupTask();
         runningInstances.add(backupManager);
         return backupManager;
@@ -121,14 +118,14 @@ public class BackupManager {
             Charset charset = bibDatabaseContext.getMetaData().getEncoding().orElse(preferences.getDefaultEncoding());
             SavePreferences savePreferences = preferences.loadForSaveFromPreferences().withEncoding
                     (charset).withMakeBackup(false);
-            new BibtexDatabaseWriter<>(FileSaveSession::new).saveDatabase(bibDatabaseContext, savePreferences).commit
-                    (backupPath);
-        } catch (SaveException e) {
-            logIfCritical(e);
+            new BibtexDatabaseWriter(new AtomicFileWriter(backupPath, savePreferences.getEncoding()), savePreferences, entryTypesManager)
+                    .saveDatabase(bibDatabaseContext);
+        } catch (IOException e) {
+            logIfCritical(backupPath, e);
         }
     }
 
-    private void logIfCritical(SaveException e) {
+    private void logIfCritical(Path backupPath, IOException e) {
         Throwable innermostCause = e;
         while (innermostCause.getCause() != null) {
             innermostCause = innermostCause.getCause();
@@ -137,7 +134,7 @@ public class BackupManager {
 
         // do not print errors in field values into the log during autosave
         if (!isErrorInField) {
-            LOGGER.error("Error while saving file.", e);
+            LOGGER.error("Error while saving to file" + backupPath, e);
         }
     }
 
@@ -147,11 +144,7 @@ public class BackupManager {
     }
 
     private void startBackupTask() {
-        try {
-            executor.submit(backupTask);
-        } catch (RejectedExecutionException e) {
-            LOGGER.debug("Rejecting while another backup process is already running.");
-        }
+        throttler.schedule(() -> determineBackupPath().ifPresent(this::performBackup));
     }
 
     /**
@@ -161,7 +154,7 @@ public class BackupManager {
     private void shutdown() {
         changeFilter.unregisterListener(this);
         changeFilter.shutdown();
-        executor.shutdown();
+        throttler.shutdown();
         determineBackupPath().ifPresent(this::deleteBackupFile);
     }
 

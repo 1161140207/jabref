@@ -1,13 +1,15 @@
 package org.jabref.model.database;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.jabref.model.database.event.EntryAddedEvent;
-import org.jabref.model.database.event.EntryRemovedEvent;
+import org.jabref.model.database.event.EntriesAddedEvent;
+import org.jabref.model.database.event.EntriesRemovedEvent;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.event.FieldChangedEvent;
+import org.jabref.model.entry.field.InternalField;
 
 import com.google.common.eventbus.Subscribe;
 
@@ -19,11 +21,10 @@ public class DuplicationChecker {
     /** use a map instead of a set since I need to know how many of each key is in there */
     private final Map<String, Integer> allKeys = new HashMap<>();
 
-
     /**
      * Checks if there is more than one occurrence of this key
      */
-    public boolean isDuplicateCiteKeyExisting(String citeKey) {
+    private boolean isDuplicateCiteKeyExisting(String citeKey) {
         return getNumberOfKeyOccurrences(citeKey) > 1;
     }
 
@@ -85,26 +86,22 @@ public class DuplicationChecker {
 
     @Subscribe
     public void listen(FieldChangedEvent fieldChangedEvent) {
-        if (fieldChangedEvent.getFieldName().equals(BibEntry.KEY_FIELD)) {
+        if (fieldChangedEvent.getField().equals(InternalField.KEY_FIELD)) {
             removeKeyFromSet(fieldChangedEvent.getOldValue());
             addKeyToSet(fieldChangedEvent.getNewValue());
         }
     }
 
     @Subscribe
-    public void listen(EntryRemovedEvent entryRemovedEvent) {
-        Optional<String> citeKey = entryRemovedEvent.getBibEntry().getCiteKeyOptional();
-        if (citeKey.isPresent()) {
-            removeKeyFromSet(citeKey.get());
-        }
+    public void listen(EntriesRemovedEvent entriesRemovedEvent) {
+        List<BibEntry> entries = entriesRemovedEvent.getBibEntries();
+        entries.stream().map(BibEntry::getCiteKeyOptional).flatMap(Optional::stream).forEach(citeKey -> removeKeyFromSet(citeKey));
     }
 
     @Subscribe
-    public void listen(EntryAddedEvent entryAddedEvent) {
-        Optional<String> citekey = entryAddedEvent.getBibEntry().getCiteKeyOptional();
-        if (citekey.isPresent()) {
-            addKeyToSet(citekey.get());
-        }
+    public void listen(EntriesAddedEvent entriesAddedEvent) {
+        List<BibEntry> entries = entriesAddedEvent.getBibEntries();
+        entries.stream().map(BibEntry::getCiteKeyOptional).flatMap(Optional::stream).forEach(citeKey -> addKeyToSet(citeKey));
     }
 
 }
